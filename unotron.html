@@ -59,9 +59,42 @@
         <div style="font-weight: 600;">Wartungsintervall Unotron</div>
     </div>
 
-    <div class="header">
-        <div><span class="bosch-text">BOSCH</span><span style="color:#525f6b; font-weight:bold; margin-left:8px;">UNO-V1.2</span></div>
-        <button id="authBtn" class="nav-btn" onclick="openModal()">🔑 Login</button>
+<div class="header">
+        <div class="bosch-brand" style="display: flex; align-items: center; gap: 15px;">
+            <div style="cursor:pointer" onclick="window.location.href='index.html'">
+                <span class="bosch-text">BOSCH</span><span class="version-tag">W430</span>
+            </div>
+            <nav style="display: flex; gap: 10px; margin-left: 10px;">
+                <a href="index.html" style="text-decoration:none; color:var(--bosch-blue); font-weight:bold; font-size:13px; border: 1px solid #ccc; padding: 4px 8px; border-radius: 4px; background: #f9f9f9;">🏠 Home</a>
+                <a href="agie.html" style="text-decoration:none; color:#555; font-size:13px; padding: 4px 8px;">⚡ Agie</a>
+                <a href="unotron.html" style="text-decoration:none; color:#555; font-size:13px; padding: 4px 8px;">🧪 Unotron</a>
+                <a href="he.html" style="text-decoration:none; color:#555; font-size:13px; padding: 4px 8px; font-weight: bold; border-bottom: 2px solid var(--bosch-red);">⚙️ HE</a>
+            </nav>
+        </div>
+
+        <div style="display: flex; gap: 20px; align-items: center;">
+            <div id="timerDisplay" style="font-size: 13px; color: var(--bosch-red); font-weight: bold; display: none;"></div>
+            <div id="statusLabel" style="font-size: 14px; font-weight: bold; color: #008a4f;">Online</div>
+            <button id="helpBtn" class="nav-btn" onclick="toggleHelp()" style="border-radius: 50%; width: 35px; height: 35px; padding: 0; font-size: 18px; background: #003a6c; color: white; border: none; cursor: pointer;">?</button>
+        </div>
+
+        <div id="helpLoggedOut" class="modal">
+            <div class="modal-box" style="text-align: left;">
+                <h2 style="color:var(--bosch-blue)">Anleitung: Registrierung</h2>
+                <hr>
+                <p>1. Oben auf <b>🔑 Login</b> klicken.<br>2. <b>"Hier registrieren"</b> wählen.<br>3. <b>Den Einladungscode erhalten Sie von Ihrem TL, FK oder Admin.</b></p>
+                <p style="font-weight:bold; color:var(--bosch-blue);">Verantwortlich: Norman Schultheis</p>
+                <button class="nav-btn btn-primary" style="width:100%" onclick="closeModal('helpLoggedOut')">Verstanden</button>
+            </div>
+        </div>
+        
+        <div id="helpLoggedIn" class="modal">
+            <div class="modal-box help-list">
+                <h2 style="color:var(--bosch-blue); text-align: center;">Hilfe & Funktionen</h2>
+                <hr>
+                <button class="nav-btn btn-primary" style="width:100%" onclick="closeModal('helpLoggedIn')">Schließen</button>
+            </div>
+        </div>
     </div>
 
     <div id="authModal" class="modal">
