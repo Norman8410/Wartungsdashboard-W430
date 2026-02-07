@@ -139,7 +139,18 @@
     </div>
 
     <div class="header">
-        <div class="bosch-brand"><span class="bosch-text">BOSCH</span><span class="version-tag">V1.1</span></div>
+        <div class="bosch-brand" style="display: flex; align-items: center; gap: 15px;">
+            <div style="cursor:pointer" onclick="window.location.href='index.html'">
+                <span class="bosch-text">BOSCH</span><span class="version-tag">W430</span>
+            </div>
+            <nav style="display: flex; gap: 10px; margin-left: 10px;">
+                <a href="index.html" style="text-decoration:none; color:var(--bosch-blue); font-weight:bold; font-size:13px; border: 1px solid #ccc; padding: 4px 8px; border-radius: 4px; background: #f9f9f9;">🏠 Home</a>
+                <a href="agie.html" style="text-decoration:none; color:#555; font-size:13px; padding: 4px 8px;">⚡ Agie</a>
+                <a href="unotron.html" style="text-decoration:none; color:#555; font-size:13px; padding: 4px 8px;">🧪 Unotron</a>
+                <a href="he.html" style="text-decoration:none; color:#555; font-size:13px; padding: 4px 8px; font-weight: bold; border-bottom: 2px solid var(--bosch-red);">⚙️ HE</a>
+            </nav>
+        </div>
+
         <div style="display: flex; gap: 20px; align-items: center;">
             <div id="timerDisplay" style="font-size: 13px; color: var(--bosch-red); font-weight: bold; display: none;"></div>
             <div id="statusLabel" style="font-size: 14px; font-weight: bold; color: #008a4f;">Online</div>
@@ -160,27 +171,6 @@
             <div class="modal-box help-list">
                 <h2 style="color:var(--bosch-blue); text-align: center;">Hilfe & Funktionen</h2>
                 <hr>
-                <div class="help-section">
-                    <b>Farblegende (Status):</b><br>
-                    • <span class="color-dot" style="background:#008a4f"></span> <b>Grün:</b> Alles okay (Rest > 2000)<br>
-                    • <span class="color-dot" style="background:#ffa500"></span> <b>Orange:</b> Wartung bald fällig (Rest < 2000)<br>
-                    • <span class="color-dot" style="background:#ff4d4d"></span> <b>Hellrot:</b> Kritischer Bereich (Rest < 500)<br>
-                    • <span class="color-dot" style="background:#8b0000"></span> <b>Dunkelrot (Blinkend):</b> Wartung überfällig!
-                </div>
-                <div class="help-section">
-                    <b>Intervalle & Pakete:</b><br>
-                    • 0 Klicks: P1/2 | 1: P1/3 | 4: P1/2/3 | 11: P1/6/7 (Groß)<br>
-                    • Ein Klick (+) erhöht das Soll um 16.000 (Gedeckelt bei 16.000 Rest).
-                </div>
-                <div class="help-section">
-                    <b>Admin & Export:</b><br>
-                    • <b>⚙️ Admin:</b> Korrektur von Fehlklicks oder Zurücksetzen von Werten (Admin-PW nötig).<br>
-                    • <b>📊 CSV Protokoll:</b> Exportiert den gesamten Verlauf als Datei.
-                </div>
-                <div class="help-section">
-                    <b>WP-Reset:</b><br>
-                    Wird erst nach <b>Zyklus 12</b> und bei <b>Rest < 2000</b> aktiv. Setzt die Maschine auf Grundzustand (0) und addiert 208.000 zum Offset.
-                </div>
                 <button class="nav-btn btn-primary" style="width:100%" onclick="closeModal('helpLoggedIn')">Schließen</button>
             </div>
         </div>
