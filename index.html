@@ -2,77 +2,49 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>BOSCH - Wartungs Leitstelle</title>
+    <title>BOSCH W430 - Central Cockpit</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
         :root { --bosch-red: #d50000; --bosch-dark-red: #8b0000; --bosch-blue: #003a6c; --bosch-green: #008a4f; --bosch-gray: #eff1f2; --bosch-orange: #ffa500; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        
-        /* Bosch Top Bar */
         .top-bar { height: 45px; background: linear-gradient(90deg, #d50000 0%, #d50000 25%, #003a6c 25%, #003a6c 50%, #00b5e2 50%, #00b5e2 75%, #008a4f 75%, #008a4f 100%); display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; }
-        
-        .header { background: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .bosch-text { color: #d50000; font-size: 28px; font-weight: 900; letter-spacing: -1.5px; }
-        
-        /* Navigation Buttons */
-        .nav-hub { display: flex; gap: 10px; }
-        .hub-btn { text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; color: white; transition: 0.3s; display: flex; align-items: center; gap: 8px; }
-        .btn-he { background: var(--bosch-blue); }
-        .btn-uno { background: var(--bosch-green); }
-        .btn-agie { background: #525f6b; }
-        .hub-btn:hover { opacity: 0.8; transform: translateY(-2px); }
-
-        /* Grid */
+        .header { background: white; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .bosch-text { color: #d50000; font-size: 26px; font-weight: 900; letter-spacing: -1px; }
+        .nav-hub { display: flex; gap: 8px; }
+        .hub-btn { text-decoration: none; padding: 8px 15px; border-radius: 3px; font-weight: bold; color: white; font-size: 13px; transition: 0.2s; }
+        .btn-he { background: var(--bosch-blue); } .btn-uno { background: var(--bosch-green); } .btn-agie { background: #525f6b; }
+        .hub-btn:hover { opacity: 0.8; }
         .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding: 20px; flex: 1; overflow: hidden; }
-        .col { background: #fdfdfd; border-radius: 6px; display: flex; flex-direction: column; border-top: 8px solid #ccc; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-        .col-header { padding: 15px; font-weight: 800; font-size: 1.2rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .col-content { padding: 15px; overflow-y: auto; flex: 1; }
-        
-        /* Machine Cards */
-        .card { background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 12px; border-left: 10px solid #ccc; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .card-type { font-size: 11px; font-weight: bold; color: #888; text-transform: uppercase; margin-bottom: 5px; }
-        .card-id { font-size: 18px; font-weight: bold; color: var(--bosch-blue); }
-        .card-rest { font-size: 18px; font-weight: 900; float: right; }
-        
-        /* Status Colors */
-        .crit { border-left-color: var(--bosch-dark-red); background: #fff5f5; animation: pulse-red 2s infinite; }
-        @keyframes pulse-red { 0% { box-shadow: 0 0 0px rgba(139,0,0,0); } 50% { box-shadow: 0 0 10px rgba(139,0,0,0.3); } 100% { box-shadow: 0 0 0px rgba(139,0,0,0); } }
+        .col { background: #fdfdfd; border-radius: 5px; display: flex; flex-direction: column; border-top: 8px solid #ccc; box-shadow: 0 4px 10px rgba(0,0,0,0.06); }
+        .col-header { padding: 12px; font-weight: bold; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        .col-content { padding: 12px; overflow-y: auto; flex: 1; }
+        .card { background: white; border: 1px solid #ddd; padding: 12px; margin-bottom: 10px; border-left: 10px solid #ccc; border-radius: 3px; }
+        .card-type { font-size: 10px; font-weight: bold; color: #999; text-transform: uppercase; }
+        .card-id { font-size: 17px; font-weight: bold; color: var(--bosch-blue); }
+        .card-rest { font-size: 17px; font-weight: 900; float: right; }
+        .crit { border-left-color: var(--bosch-dark-red); background: #fff8f8; animation: blink 2s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
         .urg { border-left-color: var(--bosch-red); }
         .warn { border-left-color: var(--bosch-orange); }
-        
-        .counter-badge { background: #eee; padding: 2px 10px; border-radius: 20px; font-size: 14px; color: #333; }
     </style>
 </head>
 <body>
-    <div class="top-bar">BOSCH MAINTENANCE CONTROL CENTER</div>
-    
+    <div class="top-bar">BOSCH W430 MAINTENANCE CONTROL</div>
     <div class="header">
         <div class="bosch-text">BOSCH</div>
         <div class="nav-hub">
-            <a class="hub-btn btn-agie" href="https://norman8410.github.io/agie-wartung/">⚡ Agie Detail</a>
-            <a class="hub-btn btn-uno" href="https://norman8410.github.io/unotron-wartung/">🧪 Unotron Detail</a>
-            <a class="hub-btn btn-he" href="he-detail.html">⚙️ HE Detail</a>
+            <a class="hub-btn btn-agie" href="agie.html">⚡ Agie</a>
+            <a class="hub-btn btn-uno" href="unotron.html">🧪 Unotron</a>
+            <a class="hub-btn btn-he" href="he.html">⚙️ HE</a>
         </div>
     </div>
-
     <div class="grid">
-        <div class="col" style="border-top-color: var(--bosch-dark-red)">
-            <div class="col-header" style="color: var(--bosch-dark-red)">ÜBERFÄLLIG <span class="counter-badge" id="c1">0</span></div>
-            <div id="l1" class="col-content"></div>
-        </div>
-        <div class="col" style="border-top-color: var(--bosch-red)">
-            <div class="col-header" style="color: var(--bosch-red)">DRINGEND <span class="counter-badge" id="c2">0</span></div>
-            <div id="l2" class="col-content"></div>
-        </div>
-        <div class="col" style="border-top-color: var(--bosch-orange)">
-            <div class="col-header" style="color: var(--bosch-orange)">PLANUNG <span class="counter-badge" id="c3">0</span></div>
-            <div id="l3" class="col-content"></div>
-        </div>
+        <div class="col" style="border-top-color: var(--bosch-dark-red)"><div class="col-header" style="color:var(--bosch-dark-red)">ÜBERFÄLLIG <span id="c1">0</span></div><div id="l1" class="col-content"></div></div>
+        <div class="col" style="border-top-color: var(--bosch-red)"><div class="col-header" style="color:var(--bosch-red)">KRITISCH <span id="c2">0</span></div><div id="l2" class="col-content"></div></div>
+        <div class="col" style="border-top-color: var(--bosch-orange)"><div class="col-header" style="color:var(--bosch-orange)">WARNUNG <span id="c3">0</span></div><div id="l3" class="col-content"></div></div>
     </div>
-
     <script>
-        // Konfiguration bleibt gleich wie im vorigen Schritt
         const firebaseConfig = {
             apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg",
             authDomain: "bosch-agie-wartung.firebaseapp.com",
@@ -84,61 +56,51 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        const INT = 156000, UNO = [2000, 4000, 10000, 14000, 18000, 26000, 28000, 30000, 34000, 42000, 50000, 56000, 58000, 66000, 74000, 82000, 90000, 98000, 104000];
 
-        const AGIE_INT = 156000;
-        const HE_INT = 156000;
-        const UNO_STEPS = [2000, 4000, 10000, 14000, 18000, 26000, 28000, 30000, 34000, 42000, 50000, 56000, 58000, 66000, 74000, 82000, 90000, 98000, 104000];
-
-        async function loadData() {
+        async function load() {
             let list = [];
+            const [sA, sH, sU] = await Promise.all([
+                db.ref('maintenanceState').once('value'),
+                db.ref('maintenanceStateHE').once('value'),
+                db.ref('maintenanceStateUnotron').once('value')
+            ]);
             
-            // Agie
-            const sA = await db.ref('maintenanceState').once('value');
-            const dA = sA.val() || {};
-            (dA.cloudRawData || []).forEach(m => {
-                const id = m.StationNo || m.STATIONNO, ist = (parseInt(m.Parts || m.PARTS) || 0) + ((dA.manualOffsets || {})[id] || 0), c = (dA.extraCycles || {})[id] || 0;
-                addToList(list, '⚡ Agie', id, ((c+1)*AGIE_INT) - ist, ((((c+1)*AGIE_INT)-ist)/AGIE_INT)*100);
-            });
+            const process = (snap, type, interval) => {
+                const d = snap.val() || {};
+                (d.cloudRawData || []).forEach(m => {
+                    const id = m.StationNo || m.STATIONNO;
+                    const ist = (parseInt(m.Parts || m.PARTS || m['COUNT(*)']) || 0) + ((d.manualOffsets || {})[id] || 0);
+                    const c = (d.extraCycles || {})[id] || 0;
+                    let target, prev = 0;
+                    if(Array.isArray(interval)) { 
+                        prev = c > 0 ? interval[c-1] : 0; target = interval[c] || 104000; 
+                    } else { 
+                        target = (c + 1) * interval; prev = c * interval; 
+                    }
+                    const rest = target - ist;
+                    const perc = (rest / (target - prev)) * 100;
+                    if(rest <= 0) list.push({t:type, id, r:rest, s:'crit'});
+                    else if(perc <= 3.125) list.push({t:type, id, r:rest, s:'urg'});
+                    else if(perc <= 12.5) list.push({t:type, id, r:rest, s:'warn'});
+                });
+            };
 
-            // HE
-            const sH = await db.ref('maintenanceStateHE').once('value');
-            const dH = sH.val() || {};
-            (dH.cloudRawData || []).forEach(m => {
-                const id = m.StationNo || m.STATIONNO, ist = (parseInt(m.Parts || m.PARTS) || 0) + ((dH.manualOffsets || {})[id] || 0), c = (dH.extraCycles || {})[id] || 0;
-                addToList(list, '⚙️ HE', id, ((c+1)*HE_INT) - ist, ((((c+1)*HE_INT)-ist)/HE_INT)*100);
-            });
-
-            // Unotron
-            const sU = await db.ref('maintenanceStateUnotron').once('value');
-            const dU = sU.val() || {};
-            (dU.cloudRawData || []).forEach(m => {
-                const id = m.STATIONNO || m.StationNo, ist = parseInt(m['COUNT(*)'] || m.Parts) || 0, c = (dU.extraCycles || {})[id] || 0;
-                const prev = c > 0 ? UNO_STEPS[c-1] : 0, target = UNO_STEPS[c] || 104000;
-                addToList(list, '🧪 Unotron', id, target - ist, ((target - ist) / (target - prev)) * 100);
-            });
-
-            renderGrid(list);
-        }
-
-        function addToList(l, t, id, r, p) {
-            let s = '';
-            if (r <= 0) s = 'crit'; else if (p <= 3.125) s = 'urg'; else if (p <= 12.5) s = 'warn';
-            if (s) l.push({ t, id, r, s });
-        }
-
-        function renderGrid(list) {
-            let h = { crit: '', urg: '', warn: '' }, c = { crit: 0, urg: 0, warn: 0 };
+            process(sA, '⚡ Agie', INT);
+            process(sH, '⚙️ HE', INT);
+            process(sU, '🧪 Unotron', UNO);
+            
+            let h = {crit:'', urg:'', warn:''}, c = {crit:0, urg:0, warn:0};
             list.sort((a,b) => a.r - b.r).forEach(m => {
                 c[m.s]++;
                 h[m.s] += `<div class="card ${m.s}"><div class="card-rest">${m.r.toLocaleString()}</div><div class="card-type">${m.t}</div><div class="card-id">#${m.id}</div></div>`;
             });
-            document.getElementById('l1').innerHTML = h.crit; document.getElementById('c1').innerText = c.crit;
-            document.getElementById('l2').innerHTML = h.urg;  document.getElementById('c2').innerText = c.urg;
-            document.getElementById('l3').innerHTML = h.warn; document.getElementById('c3').innerText = c.warn;
+            ['crit','urg','warn'].forEach((s, i) => {
+                document.getElementById('l'+(i+1)).innerHTML = h[s];
+                document.getElementById('c'+(i+1)).innerText = c[s];
+            });
         }
-
-        loadData();
-        setInterval(loadData, 30000);
+        load(); setInterval(load, 30000);
     </script>
 </body>
 </html>
