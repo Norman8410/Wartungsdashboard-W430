@@ -17,7 +17,7 @@
         .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding: 20px; flex: 1; overflow: hidden; }
         .column { background: white; border-top: 5px solid var(--bosch-blue); display: flex; flex-direction: column; overflow: hidden; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .col-header { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-weight: bold; font-size: 1.2em; display: flex; justify-content: space-between; align-items: center; }
-        .col-header a { text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px; font-size: 0.9em; }
+        .col-header a { text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px; font-size: 0.9em; cursor: pointer; }
         .machine-list { flex: 1; overflow-y: auto; padding: 10px; }
         
         .card { padding: 12px; border-bottom: 1px solid #eee; border-left: 8px solid #ccc; margin-bottom: 8px; background: #fff; }
@@ -35,13 +35,15 @@
         .btn-primary { background: var(--bosch-blue); color: white; border: none; }
         
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 4000; }
-        .modal-box { background: white; padding: 30px; border-top: 8px solid var(--bosch-red); width: 450px; text-align: left; border-radius: 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal-box { background: white; padding: 30px; border-top: 8px solid var(--bosch-red); width: 450px; text-align: left; border-radius: 4px; }
         input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; box-sizing: border-box; }
+        
+        #timeout-bar { position: absolute; bottom: 0; left: 0; height: 4px; background: var(--bosch-red); transition: width 1s linear; width: 0%; }
         
         @keyframes pulse { 0% { background: #fff; } 50% { background: #fff0f0; } 100% { background: #fff; } }
     </style>
 </head>
-<body>
+<body onmousedown="resetInactivityTimer()" onkeydown="resetInactivityTimer()">
 
 <div class="top-bar"></div>
 <div class="header">
@@ -59,27 +61,29 @@
 
 <div class="dashboard-grid">
     <div class="column">
-        <div class="col-header"><a href="https://norman8410.github.io/agie-wartung/" target="_blank">⚡ Agie ➔</a> <span id="count-agie">0</span></div>
+        <div class="col-header"><a onclick="openManagedWindow('https://norman8410.github.io/agie-wartung/')">⚡ Agie ➔</a> <span id="count-agie">0</span></div>
         <div class="machine-list" id="list-agie"></div>
     </div>
     <div class="column" style="border-top-color: var(--bosch-green);">
-        <div class="col-header"><a href="https://norman8410.github.io/unotron-wartung/" target="_blank">🧪 Unotron ➔</a> <span id="count-uno">0</span></div>
+        <div class="col-header"><a onclick="openManagedWindow('https://norman8410.github.io/unotron-wartung/')">🧪 Unotron ➔</a> <span id="count-uno">0</span></div>
         <div class="machine-list" id="list-uno"></div>
     </div>
     <div class="column" style="border-top-color: var(--bosch-light-blue);">
-        <div class="col-header"><a href="https://norman8410.github.io/HE-Wartung/" target="_blank">⚙️ HE ➔</a> <span id="count-he">0</span></div>
+        <div class="col-header"><a onclick="openManagedWindow('https://norman8410.github.io/HE-Wartung/')">⚙️ HE ➔</a> <span id="count-he">0</span></div>
         <div class="machine-list" id="list-he"></div>
     </div>
 </div>
 
+<div id="timeout-bar"></div>
+
 <div id="loginModal" class="modal">
     <div class="modal-box" style="text-align: center;">
-        <h3 id="mTitle">Login</h3>
+        <h3>Login</h3>
         <input type="email" id="mEmail" placeholder="E-Mail">
         <input type="password" id="mPass" placeholder="Passwort">
         <div id="regExtra" style="display:none;">
             <input type="text" id="mInvite" placeholder="Einladungscode">
-            <p style="font-size:11px;color:#666;">Den Einladungscode erhalten Sie von Ihrem TL, FK oder Admin.</p>
+            <p style="font-size:11px;color:#666;">Einladungscode vom TL, FK oder Admin.</p>
         </div>
         <button class="nav-btn btn-primary" style="width:100%;margin-top:10px;" onclick="handleAuthAction()">Bestätigen</button>
         <p id="toggleT" style="cursor:pointer;color:var(--bosch-blue);font-size:12px;" onclick="toggleM()">Konto erstellen?</p>
@@ -89,19 +93,13 @@
 
 <div id="helpModal" class="modal">
     <div class="modal-box">
-        <h2 style="color:var(--bosch-blue); border-bottom: 2px solid var(--bosch-red); padding-bottom: 10px; margin-top: 0;">System-Anleitung</h2>
-        <div style="font-size: 0.9em; line-height: 1.4; color: #333; max-height: 350px; overflow-y: auto;">
-            <p><strong>1. Überwachung:</strong> Das Dashboard listet alle Maschinen, deren Wartung bald fällig ist. 
-            <span style="color:orange; font-weight:bold;">Gelb</span> (Warnung), <span style="color:red; font-weight:bold;">Rot</span> (Kritisch).</p>
-            <p><strong>2. Pakete:</strong> Unter der Maschinennummer wird das spezifisch fällige Paket (z.B. P1/2 oder P 6/7/12) angezeigt.</p>
-            <p><strong>3. Einsteller-Zuweisung:</strong> Loggen Sie sich ein, um einen Einsteller für eine Maschine zu wählen. Diese Änderung erfordert zur Sicherheit das Admin-PW.</p>
-            <p><strong>4. Audit-Log:</strong> Jede Änderung wird für Audit-Zwecke protokolliert (Wer, Wann, Was). Der Export ist für Admins über den CSV-Button möglich.</p>
+        <h2 style="color:var(--bosch-blue); border-bottom: 2px solid var(--bosch-red); padding-bottom: 10px;">System-Anleitung</h2>
+        <div style="font-size: 0.9em; line-height: 1.4;">
+            <p><strong>1. Überwachung:</strong> Gelbe/Rote Karten zeigen fällige Wartungen.</p>
+            <p><strong>2. Sicherheit:</strong> Jede Änderung wird im Audit-Log gespeichert.</p>
+            <p><strong>3. Auto-Logout:</strong> Nach 70s Inaktivität (kein Klick/Tastendruck) wird der User ausgeloggt und alle Fenster geschlossen.</p>
             <hr>
-            <div style="background: #f8f9fa; padding: 10px; border-left: 4px solid var(--bosch-blue);">
-                <strong>Systemverantwortlicher & Projektleiter:</strong><br>
-                <span style="font-size: 1.1em; font-weight: bold;">Norman Schultheis</span><br>
-                Ansprechpartner für Einladungscodes, Audit-Berichte und techn. Support.
-            </div>
+            <strong>Systemverantwortlicher: Norman Schultheis</strong>
         </div>
         <button class="nav-btn btn-primary" style="width:100%; margin-top:20px;" onclick="closeModals()">Schließen</button>
     </div>
@@ -117,7 +115,37 @@
 
     let state = { config:{}, assignments:{}, agie:{}, uno:{}, he:{} };
     let isReg = false;
+    let managedWindows = [];
+    let inactivityTimer;
 
+    // Timer Logik (70 Sekunden)
+    function resetInactivityTimer() {
+        clearTimeout(inactivityTimer);
+        if (auth.currentUser) {
+            inactivityTimer = setTimeout(forceLogout, 70000);
+            document.getElementById('timeout-bar').style.width = "0%";
+            setTimeout(() => document.getElementById('timeout-bar').style.width = "100%", 100);
+        }
+    }
+
+    async function forceLogout() {
+        // Fenster schließen
+        managedWindows.forEach(win => { if(!win.closed) win.close(); });
+        managedWindows = [];
+        // Firebase Logout
+        if(auth.currentUser) {
+            await auth.signOut();
+            alert("Sitzung beendet (70s Inaktivität). Alle Fenster wurden geschlossen.");
+        }
+        document.getElementById('timeout-bar').style.width = "0%";
+    }
+
+    function openManagedWindow(url) {
+        const win = window.open(url, '_blank');
+        if(win) managedWindows.push(win);
+    }
+
+    // Firebase Sync & UI
     db.ref('config').on('value', s => { state.config = s.val() || {}; updateUI(); });
     db.ref('dashboardAssignments').on('value', s => { state.assignments = s.val() || {}; updateUI(); });
     db.ref('maintenanceState').on('value', s => { state.agie = s.val() || {}; updateUI(); });
@@ -126,6 +154,8 @@
 
     auth.onAuthStateChanged(user => {
         document.getElementById('authBtn').innerText = user ? "🔓 Logout" : "🔑 Login";
+        if(user) resetInactivityTimer();
+        else { clearTimeout(inactivityTimer); document.getElementById('timeout-bar').style.width = "0%"; }
         updateUI();
     });
 
@@ -152,6 +182,7 @@
         }
         await db.ref(`dashboardAssignments/${key}`).set(val);
         writeLog("Einsteller Zuweisung", key, `Neuer Einsteller: ${val}`);
+        resetInactivityTimer();
     }
 
     async function exportAuditLog() {
@@ -163,7 +194,7 @@
         Object.values(logs).forEach(l => { csv += `${l.timestamp};${l.user};${l.action};${l.machine};${l.detail}\n`; });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        link.setAttribute("download", `Wartung_Log_${new Date().toLocaleDateString()}.csv`);
+        link.setAttribute("download", `AuditLog.csv`);
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
 
@@ -215,7 +246,7 @@
     function toggleM() { isReg=!isReg; document.getElementById('regExtra').style.display=isReg?'block':'none'; }
     function openAdminModal() {
         if(prompt("Admin PW:") === state.config.AdminPW) {
-            const nl = prompt("Einsteller (Komma getrennt):", (state.config.einstellerListe||[]).join(','));
+            const nl = prompt("Einsteller:", (state.config.einstellerListe||[]).join(','));
             if(nl) db.ref('config/einstellerListe').set(nl.split(',').map(s=>s.trim()));
         }
     }
