@@ -95,12 +95,13 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database(), auth = firebase.auth();
 
+        let cloudConfig = { masterPassword: "" };
         let state = { cloudRawData: [], extraCycles: {}, agieOffsets: {} };
         let chart = null;
+        let isProcessing = false;
 
-        // Schließt Fenster wenn Dashboard ausloggt
-        auth.onAuthStateChanged(user => { if(!user) window.close(); });
-
+        // Passwort und Daten laden
+        db.ref('config').on('value', snap => { if(snap.exists()) cloudConfig = snap.val(); });
         db.ref('maintenanceState').on('value', snap => {
             const val = snap.val() || {};
             state.cloudRawData = val.cloudRawData || [];
@@ -108,6 +109,9 @@
             state.agieOffsets = val.agieOffsets || {};
             updateUI();
         });
+
+        // Schließt Fenster wenn Dashboard ausloggt
+        auth.onAuthStateChanged(user => { if(!user) window.close(); });
 
         function updateUI() {
             const packages = ["P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/5", "P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/6/7", "P1/2"];
@@ -127,10 +131,15 @@
             const list = document.getElementById('machineList');
             list.innerHTML = data.map(d => {
                 const isOverdue = d.rest <= 0;
+                // WP wird aktiv ab Zyklus 12 und wenig Rest (Original-Logik)
+                const wpEnabled = d.cycles >= 12 && d.rest < 2000;
                 return `
                 <div class="control-row ${isOverdue ? 'pulse' : ''}" style="border-left-color:${d.color}">
                     <div style="flex:1.5"><b>A${d.id}</b><br><small>${d.pkg}</small></div>
                     <div style="flex:1; text-align:right; font-weight:bold; font-size:16px; color:${isOverdue ? '#8b0000' : 'black'}">${d.rest.toLocaleString()}</div>
+                    <button class="nav-btn btn-wp" ${wpEnabled ? '' : 'disabled'} onclick="wpReset('${d.id}')">WP</button>
+                    <button class="nav-btn" onclick="changeCycle('${d.id}', -1)">-</button>
+                    <div style="width:20px; text-align:center; font-weight:bold">${d.cycles}</div>
                     <button class="nav-btn" onclick="changeCycle('${d.id}', 1)">+</button>
                 </div>`;
             }).join('');
@@ -139,8 +148,31 @@
         }
 
         async function changeCycle(id, val) {
-            const current = state.extraCycles[id] || 0;
-            await db.ref(`maintenanceState/extraCycles/${id}`).set(Math.min(12, current + val));
+            if (isProcessing) return;
+            isProcessing = true;
+            try {
+                const current = state.extraCycles[id] || 0;
+                let nC = (val > 0) ? Math.min(12, current + 1) : Math.max(0, current - 1);
+                await db.ref(`maintenanceState/extraCycles/${id}`).set(nC);
+            } finally { isProcessing = false; }
+        }
+
+        async function wpReset(id) {
+            if (isProcessing) return;
+            const input = prompt("Master-Passwort:");
+            if(input === String(cloudConfig.masterPassword)) {
+                isProcessing = true;
+                try {
+                    const newOffset = (state.agieOffsets[id] || 0) + 208000;
+                    const up = {}; 
+                    up[`maintenanceState/agieOffsets/${id}`] = newOffset;
+                    up[`maintenanceState/extraCycles/${id}`] = 0;
+                    await db.ref().update(up); 
+                    alert("WP-Reset erfolgreich!");
+                } finally { isProcessing = false; }
+            } else if (input !== null) {
+                alert("Passwort falsch!");
+            }
         }
 
         function renderChart(data) {
@@ -157,6 +189,19 @@
                     scales: { y: { beginAtZero: false } },
                     plugins: {
                         legend: { display: false },
+                        tooltip: {
+                            enabled: true,
+                            callbacks: {
+                                label: (ctx) => {
+                                    const d = data[ctx.dataIndex];
+                                    return [
+                                        `Rest: ${d.rest.toLocaleString()}`,
+                                        `Ist: ${d.ist.toLocaleString()}`,
+                                        `Wartung: ${d.pkg}`
+                                    ];
+                                }
+                            }
+                        },
                         datalabels: { 
                             anchor: 'end', align: 'top', offset: 5, rotation: -90, 
                             formatter: (v) => v.toLocaleString(), font: { weight: 'bold', size: 12 }, color: '#003a6c' 
