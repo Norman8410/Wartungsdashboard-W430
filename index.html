@@ -2,157 +2,208 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>BOSCH W430 - Central Cockpit V1.6</title>
+    <title>Zentral-Dashboard Wartung - Bosch</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        :root { --bosch-red: #d50000; --bosch-dark-red: #8b0000; --bosch-blue: #003a6c; --bosch-green: #008a4f; --bosch-gray: #eff1f2; --bosch-orange: #ffa500; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        .top-bar { height: 45px; background: linear-gradient(90deg, #d50000 0%, #d50000 25%, #003a6c 25%, #003a6c 50%, #00b5e2 50%, #00b5e2 75%, #008a4f 75%, #008a4f 100%); display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; padding: 15px; flex: 1; overflow: hidden; }
-        .col { background: #eee; border-radius: 4px; display: flex; flex-direction: column; border-top: 6px solid #ccc; overflow: hidden; }
-        .col-header { padding: 10px; font-weight: bold; color: white; text-align: center; }
-        .col-content { padding: 10px; overflow-y: auto; flex: 1; min-height: 50px; }
-        .card { background: white; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-left: 8px solid #ccc; border-radius: 3px; }
-        .card-top { display: flex; justify-content: space-between; align-items: center; }
-        .card-id { font-size: 16px; font-weight: bold; color: var(--bosch-blue); }
-        .card-rest { font-size: 18px; font-weight: 900; }
-        .overdue { border-left-color: var(--bosch-dark-red); background: #fff0f0; animation: blink 2s infinite; }
-        .overdue .card-rest { color: var(--bosch-dark-red); }
-        .crit { border-left-color: var(--bosch-red); }
-        .crit .card-rest { color: var(--bosch-red); }
-        .warn { border-left-color: var(--bosch-orange); }
-        .warn .card-rest { color: var(--bosch-orange); }
-        .assign-row { display: flex; gap: 5px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px; }
-        select { flex: 1; font-size: 12px; padding: 4px; border: 1px solid #ccc; }
-        .save-btn { cursor: pointer; background: var(--bosch-blue); color: white; border: none; padding: 2px 10px; border-radius: 2px; font-size: 14px; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        :root { 
+            --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-light-blue: #00b5e2; 
+            --bosch-green: #008a4f; --bosch-gray: #eff1f2; --bosch-dark-red: #8b0000;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+        
+        /* Header & Top Bar */
+        .top-bar { height: 10px; background: linear-gradient(90deg, #d50000 0%, #d50000 25%, #003a6c 25%, #003a6c 50%, #00b5e2 50%, #00b5e2 75%, #008a4f 75%, #008a4f 100%); }
+        .header { background: white; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        /* Dashboard Layout */
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding: 20px; flex: 1; overflow: hidden; }
+        .column { background: white; border-top: 5px solid var(--bosch-blue); display: flex; flex-direction: column; overflow: hidden; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .col-header { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-weight: bold; font-size: 1.2em; display: flex; justify-content: space-between; }
+        .machine-list { flex: 1; overflow-y: auto; padding: 10px; }
+
+        /* Machine Cards */
+        .card { padding: 12px; border-bottom: 1px solid #eee; border-left: 8px solid #ccc; margin-bottom: 8px; background: #fff; transition: 0.2s; }
+        .card.warning { border-left-color: #ffa500; }
+        .card.critical { border-left-color: var(--bosch-red); animation: pulse 2s infinite; }
+        .card.overdue { border-left-color: var(--bosch-dark-red); animation: pulse 1s infinite; }
+        
+        .card-info { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .m-name { font-weight: bold; font-size: 1.1em; }
+        .m-rest { font-weight: bold; }
+        
+        select { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 2px; font-size: 0.9em; background: #fdfdfd; }
+
+        /* UI Elements */
+        .nav-btn { padding: 8px 15px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; color: var(--bosch-blue); border-radius: 2px; }
+        .btn-primary { background: var(--bosch-blue); color: white; border: none; }
+        
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 4000; }
+        .modal-box { background: white; padding: 30px; border-top: 8px solid var(--bosch-red); width: 400px; }
+        textarea { width: 100%; height: 150px; margin: 10px 0; padding: 10px; box-sizing: border-box; }
+
+        @keyframes pulse { 0% { background: #fff; } 50% { background: #fff0f0; } 100% { background: #fff; } }
     </style>
 </head>
 <body>
 
-    <div class="top-bar">BOSCH W430 - CENTRAL MAINTENANCE DASHBOARD (V1.6)</div>
-    
-    <div class="grid">
-        <div class="col" style="border-top-color: var(--bosch-blue)">
-            <div class="col-header" style="background: var(--bosch-blue)">⚡ AGIE</div>
-            <div id="lAgie" class="col-content">Lade...</div>
-        </div>
-        <div class="col" style="border-top-color: var(--bosch-green)">
-            <div class="col-header" style="background: var(--bosch-green)">🧪 UNOTRON</div>
-            <div id="lUno" class="col-content">Lade...</div>
-        </div>
-        <div class="col" style="border-top-color: var(--bosch-red)">
-            <div class="col-header" style="background: var(--bosch-red)">⚙️ HE-ANLAGEN</div>
-            <div id="lHe" class="col-content">Lade...</div>
-        </div>
+<div class="top-bar"></div>
+<div class="header">
+    <div>
+        <span style="color:var(--bosch-red);font-weight:900;font-size:24px;">BOSCH</span> 
+        <span style="font-weight:bold;color:#555;margin-left:10px;">Wartungs-Übersicht</span>
+    </div>
+    <button class="nav-btn" onclick="openEinstellerModal()">⚙️ Einsteller bearbeiten</button>
+</div>
+
+<div class="dashboard-grid">
+    <div class="column" style="border-top-color: var(--bosch-blue);">
+        <div class="col-header">Agie <span id="count-agie" style="font-size: 0.8em; color: #666;">0</span></div>
+        <div class="machine-list" id="list-agie"></div>
     </div>
 
-    <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg",
-            authDomain: "bosch-agie-wartung.firebaseapp.com",
-            databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "bosch-agie-wartung",
-            storageBucket: "bosch-agie-wartung.firebasestorage.app",
-            messagingSenderId: "211606405555",
-            appId: "1:211606405555:web:cc2475ca47804086a3cbc6"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-        
-        let configData = {};
-        let userNames = [];
+    <div class="column" style="border-top-color: var(--bosch-green);">
+        <div class="col-header">Unotron <span id="count-uno" style="font-size: 0.8em; color: #666;">0</span></div>
+        <div class="machine-list" id="list-uno"></div>
+    </div>
 
-        // 1. Config laden
-        db.ref('config').on('value', s => { configData = s.val() || {}; });
+    <div class="column" style="border-top-color: var(--bosch-light-blue);">
+        <div class="col-header">HE <span id="count-he" style="font-size: 0.8em; color: #666;">0</span></div>
+        <div class="machine-list" id="list-he"></div>
+    </div>
+</div>
 
-        // 2. User laden (mit Fehlerbehandlung)
-        db.ref('users').on('value', s => {
-            userNames = [];
-            if (s.exists()) {
-                s.forEach(c => {
-                    const n = c.val().name || c.val().displayName;
-                    if (n) userNames.push(n);
-                });
-            }
-            render(); 
-        }, err => {
-            console.error("User-Pfad nicht lesbar:", err);
-            render(); // Trotzdem rendern, auch ohne User
-        });
+<div id="einstellerModal" class="modal">
+    <div class="modal-box">
+        <h3>Einsteller Liste bearbeiten</h3>
+        <p style="font-size: 0.8em; color: #666;">Ein Name pro Zeile eingeben:</p>
+        <textarea id="einstellerTextarea"></textarea>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button class="nav-btn" onclick="closeModal()">Abbrechen</button>
+            <button class="nav-btn btn-primary" onclick="saveEinsteller()">Speichern</button>
+        </div>
+    </div>
+</div>
 
-        const AGIE_INT = 16000;
-        const HE_INT = 156000;
-        const UNO_STEPS = [2000, 4000, 10000, 14000, 18000, 26000, 28000, 30000, 34000, 42000, 50000, 56000, 58000, 66000, 74000, 82000, 90000, 98000, 104000];
+<script>
+    // Konfiguration (Daten aus deinen Vorlagen übernommen)
+    const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung", storageBucket: "bosch-agie-wartung.firebasestorage.app", messagingSenderId: "211606405555", appId: "1:211606405555:web:cc2475ca47804086a3cbc6" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-        async function saveAssign(path, id) {
-            const name = document.getElementById(`sel_${path}_${id}`).value;
-            const pw = prompt("Bitte TelPW zur Bestätigung:");
-            if(pw === configData.TelPW) {
-                await db.ref(`${path}/assignments/${id}`).set({ name: name, time: new Date().toLocaleString() });
-                alert("Zuweisung gespeichert!");
-                render();
-            } else { alert("Falsches Passwort!"); }
-        }
+    const UNO_STEPS = [{total:2000},{total:4000},{total:10000},{total:14000},{total:18000},{total:26000},{total:28000},{total:30000},{total:34000},{total:42000},{total:50000},{total:56000},{total:58000},{total:66000},{total:74000},{total:82000},{total:90000},{total:98000},{total:104000}];
+    
+    let globalEinsteller = [];
+    let assignments = {};
+    let configData = {};
 
-        function buildCol(snap, path, interval, warn, crit) {
-            const d = snap.val() || {};
-            const raw = d.cloudRawData || [];
-            const assigns = d.assignments || {};
-            let items = [];
+    // 1. Einsteller & Config laden
+    db.ref('config').on('value', snap => {
+        configData = snap.val() || {};
+        globalEinsteller = configData.einstellerListe || [];
+        updateAllLists();
+    });
 
-            raw.forEach(m => {
-                const id = m.StationNo || m.STATIONNO || m.ID || "N/A";
-                const ist = (parseInt(m.Parts || m.PARTS || m['COUNT(*)']) || 0) + (d.manualOffsets?.[id] || 0) - (d.agieOffsets?.[id] || 0);
-                const c = d.extraCycles?.[id] || 0;
-                let target = Array.isArray(interval) ? (interval[c] || 104000) : (c + 1) * interval;
-                let rest = target - ist;
-                
-                let status = "";
-                let score = 0;
-                if(rest <= 0) { status = "overdue"; score = 3; }
-                else if(rest < crit) { status = "crit"; score = 2; }
-                else if(rest < warn) { status = "warn"; score = 1; }
+    db.ref('dashboardAssignments').on('value', snap => {
+        assignments = snap.val() || {};
+        updateAllLists();
+    });
 
-                if(status !== "") {
-                    const current = assigns[id]?.name || "";
-                    let opts = `<option value="">-- Frei --</option>`;
-                    userNames.forEach(u => opts += `<option value="${u}" ${u===current?'selected':''}>${u}</option>`);
-                    
-                    items.push({
-                        score, rest, 
-                        code: `<div class="card ${status}">
-                            <div class="card-top"><div class="card-id">#${id}</div><div class="card-rest">${rest.toLocaleString()}</div></div>
-                            <div class="assign-row">
-                                <select id="sel_${path}_${id}">${opts}</select>
-                                <button class="save-btn" onclick="saveAssign('${path}', '${id}')">💾</button>
-                            </div>
-                        </div>`
-                    });
-                }
-            });
-            if(items.length === 0) return `<div style="text-align:center; color:#999; margin-top:20px;">Alles im grünen Bereich</div>`;
-            return items.sort((a,b) => b.score - a.score || a.rest - b.rest).map(i => i.code).join('');
-        }
+    // 2. Datenüberwachung für alle 3 Bereiche
+    let rawAgie = [], rawUno = [], rawHE = [];
 
-        async function render() {
-            try {
-                const [sA, sH, sU] = await Promise.all([
-                    db.ref('maintenanceState').once('value'),
-                    db.ref('maintenanceStateHE').once('value'),
-                    db.ref('maintenanceStateUnotron').once('value')
-                ]);
-                document.getElementById('lAgie').innerHTML = buildCol(sA, 'maintenanceState', AGIE_INT, 2000, 500);
-                document.getElementById('lHe').innerHTML = buildCol(sH, 'maintenanceStateHE', HE_INT, 15000, 5000);
-                document.getElementById('lUno').innerHTML = buildCol(sU, 'maintenanceStateUnotron', UNO_STEPS, 2000, 500);
-            } catch (e) {
-                console.error("Render Fehler:", e);
-            }
-        }
+    db.ref('maintenanceState').on('value', snap => { rawAgie = snap.val() || {}; updateAllLists(); });
+    db.ref('maintenanceStateUnotron').on('value', snap => { rawUno = snap.val() || {}; updateAllLists(); });
+    db.ref('maintenanceStateHE').on('value', snap => { rawHE = snap.val() || {}; updateAllLists(); });
 
-        setInterval(render, 30000);
-        render();
-    </script>
+    function updateAllLists() {
+        processAgie();
+        processUnotron();
+        processHE();
+    }
+
+    function getStatusClass(rest, warnLimit) {
+        if (rest <= 0) return 'overdue';
+        if (rest < 500) return 'critical';
+        if (rest < warnLimit) return 'warning';
+        return 'ok';
+    }
+
+    function processAgie() {
+        if(!rawAgie.cloudRawData) return;
+        const data = rawAgie.cloudRawData.map(item => {
+            const id = item.StationNo;
+            const ist = (parseInt(item.Parts) || 0) - (rawAgie.agieOffsets?.[id] || 0);
+            const cycles = rawAgie.extraCycles?.[id] || 0;
+            const rest = (16000 + (cycles * 16000)) - ist;
+            return { id: 'A'+id, rest, type: 'Agie', warnLimit: 2000, dbKey: 'A'+id };
+        }).filter(m => m.rest < 2000);
+        renderColumn('list-agie', 'count-agie', data);
+    }
+
+    function processUnotron() {
+        if(!rawUno.cloudRawData) return;
+        const data = rawUno.cloudRawData.map(item => {
+            const id = item.STATIONNO;
+            const ist = parseInt(item["COUNT(*)"] || 0);
+            const cIdx = rawUno.extraCycles?.[id] || 0;
+            const target = UNO_STEPS[cIdx]?.total || (104000 + ((cIdx-18)*5000));
+            const rest = target - ist;
+            return { id: 'UNO-'+id, rest, type: 'Uno', warnLimit: 2000, dbKey: 'U'+id };
+        }).filter(m => m.rest < 2000);
+        renderColumn('list-uno', 'count-uno', data);
+    }
+
+    function processHE() {
+        if(!rawHE.cloudRawData) return;
+        const data = rawHE.cloudRawData.map(item => {
+            const id = item.StationNo;
+            const ist = (parseInt(item.Parts) || 0) + (rawHE.manualOffsets?.[id] || 0);
+            const cycles = rawHE.extraCycles?.[id] || 0;
+            const rest = (156000 * (cycles + 1)) - ist;
+            return { id: 'HE'+id, rest, type: 'HE', warnLimit: 15000, dbKey: 'H'+id };
+        }).filter(m => m.rest < 15000);
+        renderColumn('list-he', 'count-he', data);
+    }
+
+    function renderColumn(elementId, countId, data) {
+        data.sort((a,b) => a.rest - b.rest);
+        document.getElementById(countId).innerText = data.length;
+        const container = document.getElementById(elementId);
+        container.innerHTML = data.map(m => `
+            <div class="card ${getStatusClass(m.rest, m.warnLimit)}">
+                <div class="card-info">
+                    <span class="m-name">${m.id}</span>
+                    <span class="m-rest">${m.rest.toLocaleString()}</span>
+                </div>
+                <select onchange="assignWorker('${m.dbKey}', this.value)">
+                    <option value="">-- Einsteller wählen --</option>
+                    ${globalEinsteller.map(e => `<option value="${e}" ${assignments[m.dbKey] === e ? 'selected' : ''}>${e}</option>`).join('')}
+                </select>
+            </div>
+        `).join('');
+    }
+
+    async function assignWorker(id, name) {
+        await db.ref(`dashboardAssignments/${id}`).set(name);
+    }
+
+    // Modal Logik
+    function openEinstellerModal() {
+        const pw = prompt("Admin Passwort erforderlich:");
+        if(pw !== configData.AdminPW) return alert("Falsches Passwort!");
+        document.getElementById('einstellerTextarea').value = globalEinsteller.join('\n');
+        document.getElementById('einstellerModal').style.display = 'flex';
+    }
+
+    function closeModal() { document.getElementById('einstellerModal').style.display = 'none'; }
+
+    async function saveEinsteller() {
+        const list = document.getElementById('einstellerTextarea').value.split('\n').map(n => n.trim()).filter(n => n !== "");
+        await db.ref('config/einstellerListe').set(list);
+        closeModal();
+    }
+</script>
 </body>
 </html>
