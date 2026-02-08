@@ -19,27 +19,22 @@
         .col-header { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-weight: bold; font-size: 1.2em; display: flex; justify-content: space-between; align-items: center; }
         .col-header a { text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px; font-size: 0.9em; cursor: pointer; }
         .machine-list { flex: 1; overflow-y: auto; padding: 10px; }
-        
         .card { padding: 12px; border-bottom: 1px solid #eee; border-left: 8px solid #ccc; margin-bottom: 8px; background: #fff; }
         .card.warning { border-left-color: #ffa500; }
         .card.critical { border-left-color: var(--bosch-red); animation: pulse 2s infinite; }
         .card.overdue { border-left-color: var(--bosch-dark-red); animation: pulse 1s infinite; }
-        
         .card-info { display: flex; justify-content: space-between; align-items: flex-start; }
         .m-id { font-weight: bold; font-size: 1.1em; }
         .m-rest { font-weight: bold; font-size: 1.1em; }
         .m-paket { font-size: 0.85em; color: var(--bosch-red); font-weight: 600; margin-top: 2px; }
-        
         select { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 2px; margin-top: 8px; }
         .nav-btn { padding: 8px 15px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; color: var(--bosch-blue); border-radius: 2px; font-size: 13px; }
         .btn-primary { background: var(--bosch-blue); color: white; border: none; }
-        
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 4000; }
         .modal-box { background: white; padding: 30px; border-top: 8px solid var(--bosch-red); width: 450px; text-align: left; border-radius: 4px; }
         input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; box-sizing: border-box; }
-        
-        #timeout-bar { position: absolute; bottom: 0; left: 0; height: 4px; background: var(--bosch-red); transition: width 1s linear; width: 0%; }
-        
+        #timeout-bar-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background: #ddd; }
+        #timeout-bar { height: 100%; width: 0%; background: var(--bosch-red); transition: width 1s linear; }
         @keyframes pulse { 0% { background: #fff; } 50% { background: #fff0f0; } 100% { background: #fff; } }
     </style>
 </head>
@@ -74,7 +69,7 @@
     </div>
 </div>
 
-<div id="timeout-bar"></div>
+<div id="timeout-bar-container"><div id="timeout-bar"></div></div>
 
 <div id="loginModal" class="modal">
     <div class="modal-box" style="text-align: center;">
@@ -83,7 +78,7 @@
         <input type="password" id="mPass" placeholder="Passwort">
         <div id="regExtra" style="display:none;">
             <input type="text" id="mInvite" placeholder="Einladungscode">
-            <p style="font-size:11px;color:#666;">Einladungscode vom TL, FK oder Admin.</p>
+            <p style="font-size:11px;color:#666;">Den Einladungscode erhalten Sie von Ihrem TL, FK oder Admin.</p>
         </div>
         <button class="nav-btn btn-primary" style="width:100%;margin-top:10px;" onclick="handleAuthAction()">Bestätigen</button>
         <p id="toggleT" style="cursor:pointer;color:var(--bosch-blue);font-size:12px;" onclick="toggleM()">Konto erstellen?</p>
@@ -117,27 +112,33 @@
     let isReg = false;
     let managedWindows = [];
     let inactivityTimer;
+    let startTime;
 
-    // Timer Logik (70 Sekunden)
-    function resetInactivityTimer() {
+    // Timer Logik
+    window.resetInactivityTimer = function() {
         clearTimeout(inactivityTimer);
         if (auth.currentUser) {
+            startTime = Date.now();
             inactivityTimer = setTimeout(forceLogout, 70000);
-            document.getElementById('timeout-bar').style.width = "0%";
-            setTimeout(() => document.getElementById('timeout-bar').style.width = "100%", 100);
+            updateBar();
         }
     }
 
+    function updateBar() {
+        if (!auth.currentUser) return;
+        const elapsed = Date.now() - startTime;
+        const pct = Math.min(100, (elapsed / 70000) * 100);
+        document.getElementById('timeout-bar').style.width = pct + "%";
+        if (pct < 100) requestAnimationFrame(updateBar);
+    }
+
     async function forceLogout() {
-        // Fenster schließen
         managedWindows.forEach(win => { if(!win.closed) win.close(); });
         managedWindows = [];
-        // Firebase Logout
         if(auth.currentUser) {
             await auth.signOut();
-            alert("Sitzung beendet (70s Inaktivität). Alle Fenster wurden geschlossen.");
+            alert("Sitzung beendet (70s Inaktivität).");
         }
-        document.getElementById('timeout-bar').style.width = "0%";
     }
 
     function openManagedWindow(url) {
@@ -145,7 +146,6 @@
         if(win) managedWindows.push(win);
     }
 
-    // Firebase Sync & UI
     db.ref('config').on('value', s => { state.config = s.val() || {}; updateUI(); });
     db.ref('dashboardAssignments').on('value', s => { state.assignments = s.val() || {}; updateUI(); });
     db.ref('maintenanceState').on('value', s => { state.agie = s.val() || {}; updateUI(); });
