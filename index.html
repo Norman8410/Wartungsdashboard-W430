@@ -69,13 +69,24 @@
         
         let configData = {};
         let userNames = [];
-
-        // Config & Userliste laden
-        db.ref('config').on('value', s => configData = s.val() || {});
-        db.ref('users').on('value', s => {
-            userNames = [];
-            s.forEach(c => { if(c.val().name) userNames.push(c.val().name); });
-            render();
+    
+            // Verbesserte User-Abfrage
+            db.ref('users').on('value', s => {
+                userNames = [];
+                if (s.exists()) {
+                    s.forEach(child => {
+                        const data = child.val();
+                        // Wir suchen nach 'name' oder 'displayName'
+                        const name = data.name || data.displayName;
+                        if (name) userNames.push(name);
+                    });
+                    console.log("Benutzer geladen:", userNames);
+                } else {
+                    console.warn("Keine Benutzer unter Pfad 'users' gefunden.");
+                }
+                render(); // Cockpit neu zeichnen
+            }, err => {
+                console.error("Firebase Fehler:", err.message);
         });
 
         const AGIE_INT = 16000;
