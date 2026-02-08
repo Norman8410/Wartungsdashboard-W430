@@ -28,15 +28,15 @@
         .card-info { display: flex; justify-content: space-between; align-items: flex-start; }
         .m-id { font-weight: bold; font-size: 1.1em; }
         .m-rest { font-weight: bold; font-size: 1.1em; }
-        .m-paket { font-size: 0.85em; color: #d50000; font-weight: 600; margin-top: 2px; }
+        .m-paket { font-size: 0.85em; color: var(--bosch-red); font-weight: 600; margin-top: 2px; }
         
         select { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 2px; margin-top: 8px; }
-        .nav-btn { padding: 8px 15px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; color: var(--bosch-blue); border-radius: 2px; }
+        .nav-btn { padding: 8px 15px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; color: var(--bosch-blue); border-radius: 2px; font-size: 13px; }
         .btn-primary { background: var(--bosch-blue); color: white; border: none; }
         
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 4000; }
-        .modal-box { background: white; padding: 30px; border-top: 8px solid var(--bosch-red); width: 400px; text-align: center; }
-        input { width: 90%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; }
+        .modal-box { background: white; padding: 30px; border-top: 8px solid var(--bosch-red); width: 450px; text-align: left; border-radius: 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; box-sizing: border-box; }
         
         @keyframes pulse { 0% { background: #fff; } 50% { background: #fff0f0; } 100% { background: #fff; } }
     </style>
@@ -49,50 +49,72 @@
         <span style="color:var(--bosch-red);font-weight:900;font-size:24px;">BOSCH</span> 
         <span style="font-weight:bold;color:#555;margin-left:10px;">Zentral-Dashboard</span>
     </div>
-    <div>
+    <div style="display:flex; gap:10px;">
+        <button class="nav-btn" onclick="openHelpModal()">ℹ️ Hilfe</button>
+        <button class="nav-btn" onclick="exportAuditLog()">📊 CSV Export</button>
         <button id="authBtn" class="nav-btn" onclick="openLoginModal()">🔑 Login</button>
         <button class="nav-btn" onclick="openAdminModal()">⚙️ Einsteller</button>
     </div>
 </div>
 
 <div class="dashboard-grid">
-    <div class="column"><div class="col-header"><a href="https://norman8410.github.io/agie-wartung/" target="_blank">⚡ Agie ➔</a> <span id="count-agie">0</span></div><div class="machine-list" id="list-agie"></div></div>
-    <div class="column" style="border-top-color: var(--bosch-green);"><div class="col-header"><a href="https://norman8410.github.io/unotron-wartung/" target="_blank">🧪 Unotron ➔</a> <span id="count-uno">0</span></div><div class="machine-list" id="list-uno"></div></div>
-    <div class="column" style="border-top-color: var(--bosch-light-blue);"><div class="col-header"><a href="https://norman8410.github.io/HE-Wartung/" target="_blank">⚙️ HE ➔</a> <span id="count-he">0</span></div><div class="machine-list" id="list-he"></div></div>
+    <div class="column">
+        <div class="col-header"><a href="https://norman8410.github.io/agie-wartung/" target="_blank">⚡ Agie ➔</a> <span id="count-agie">0</span></div>
+        <div class="machine-list" id="list-agie"></div>
+    </div>
+    <div class="column" style="border-top-color: var(--bosch-green);">
+        <div class="col-header"><a href="https://norman8410.github.io/unotron-wartung/" target="_blank">🧪 Unotron ➔</a> <span id="count-uno">0</span></div>
+        <div class="machine-list" id="list-uno"></div>
+    </div>
+    <div class="column" style="border-top-color: var(--bosch-light-blue);">
+        <div class="col-header"><a href="https://norman8410.github.io/HE-Wartung/" target="_blank">⚙️ HE ➔</a> <span id="count-he">0</span></div>
+        <div class="machine-list" id="list-he"></div>
+    </div>
 </div>
 
 <div id="loginModal" class="modal">
-    <div class="modal-box">
-        <h3>Login</h3>
+    <div class="modal-box" style="text-align: center;">
+        <h3 id="mTitle">Login</h3>
         <input type="email" id="mEmail" placeholder="E-Mail">
         <input type="password" id="mPass" placeholder="Passwort">
         <div id="regExtra" style="display:none;">
             <input type="text" id="mInvite" placeholder="Einladungscode">
-            <p style="font-size:11px; color:#666;">Code erhalten Sie von TL, FK oder Admin (Norman Schultheis).</p>
+            <p style="font-size:11px;color:#666;">Den Einladungscode erhalten Sie von Ihrem TL, FK oder Admin.</p>
         </div>
-        <button class="nav-btn btn-primary" style="width:100%; margin-top:10px;" onclick="handleAuthAction()">Bestätigen</button>
-        <p id="toggleT" style="cursor:pointer; color:var(--bosch-blue); font-size:12px;" onclick="toggleM()">Konto erstellen?</p>
+        <button class="nav-btn btn-primary" style="width:100%;margin-top:10px;" onclick="handleAuthAction()">Bestätigen</button>
+        <p id="toggleT" style="cursor:pointer;color:var(--bosch-blue);font-size:12px;" onclick="toggleM()">Konto erstellen?</p>
         <button class="nav-btn" style="width:100%" onclick="closeModals()">Abbrechen</button>
     </div>
 </div>
 
+<div id="helpModal" class="modal">
+    <div class="modal-box">
+        <h2 style="color:var(--bosch-blue); border-bottom: 2px solid var(--bosch-red); padding-bottom: 10px; margin-top: 0;">System-Anleitung</h2>
+        <div style="font-size: 0.9em; line-height: 1.4; color: #333; max-height: 350px; overflow-y: auto;">
+            <p><strong>1. Überwachung:</strong> Das Dashboard listet alle Maschinen, deren Wartung bald fällig ist. 
+            <span style="color:orange; font-weight:bold;">Gelb</span> (Warnung), <span style="color:red; font-weight:bold;">Rot</span> (Kritisch).</p>
+            <p><strong>2. Pakete:</strong> Unter der Maschinennummer wird das spezifisch fällige Paket (z.B. P1/2 oder P 6/7/12) angezeigt.</p>
+            <p><strong>3. Einsteller-Zuweisung:</strong> Loggen Sie sich ein, um einen Einsteller für eine Maschine zu wählen. Diese Änderung erfordert zur Sicherheit das Admin-PW.</p>
+            <p><strong>4. Audit-Log:</strong> Jede Änderung wird für Audit-Zwecke protokolliert (Wer, Wann, Was). Der Export ist für Admins über den CSV-Button möglich.</p>
+            <hr>
+            <div style="background: #f8f9fa; padding: 10px; border-left: 4px solid var(--bosch-blue);">
+                <strong>Systemverantwortlicher & Projektleiter:</strong><br>
+                <span style="font-size: 1.1em; font-weight: bold;">Norman Schultheis</span><br>
+                Ansprechpartner für Einladungscodes, Audit-Berichte und techn. Support.
+            </div>
+        </div>
+        <button class="nav-btn btn-primary" style="width:100%; margin-top:20px;" onclick="closeModals()">Schließen</button>
+    </div>
+</div>
+
 <script>
-    const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung", storageBucket: "bosch-agie-wartung.firebasestorage.app", messagingSenderId: "211606405555", appId: "1:211606405555:web:cc2475ca47804086a3cbc6" };
+    const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database(), auth = firebase.auth();
 
-    // Paket-Definitionen aus den Quelldateien
     const AGIE_PKGS = ["P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/5", "P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/6/7", "P1/2"];
-    const UNO_STEPS = [
-        {total:2000, pkg:"P1, P2"}, {total:4000, pkg:"P3"}, {total:10000, pkg:"P1"},
-        {total:14000, pkg:"P5"}, {total:18000, pkg:"P1, P2"}, {total:26000, pkg:"P1"},
-        {total:28000, pkg:"P6, P7"}, {total:30000, pkg:"P3"}, {total:34000, pkg:"P1, P2"},
-        {total:42000, pkg:"P1"}, {total:50000, pkg:"P1, P2"}, {total:56000, pkg:"P3"},
-        {total:58000, pkg:"P1"}, {total:66000, pkg:"P1, P2"}, {total:74000, pkg:"P1"},
-        {total:82000, pkg:"P1, P2"}, {total:90000, pkg:"P3"}, {total:98000, pkg:"P1"},
-        {total:104000, pkg:"WP RESET"}
-    ];
-    
+    const UNO_STEPS = [{total:2000, pkg:"P1, P2"}, {total:4000, pkg:"P3"}, {total:10000, pkg:"P1"}, {total:14000, pkg:"P5"}, {total:18000, pkg:"P1, P2"}, {total:26000, pkg:"P1"}, {total:28000, pkg:"P6, P7"}, {total:30000, pkg:"P3"}, {total:34000, pkg:"P1, P2"}, {total:42000, pkg:"P1"}, {total:50000, pkg:"P1, P2"}, {total:56000, pkg:"P3"}, {total:58000, pkg:"P1"}, {total:66000, pkg:"P1, P2"}, {total:74000, pkg:"P1"}, {total:82000, pkg:"P1, P2"}, {total:90000, pkg:"P3"}, {total:98000, pkg:"P1"}, {total:104000, pkg:"WP RESET"}];
+
     let state = { config:{}, assignments:{}, agie:{}, uno:{}, he:{} };
     let isReg = false;
 
@@ -107,15 +129,18 @@
         updateUI();
     });
 
+    async function writeLog(action, machine, detail) {
+        const user = auth.currentUser ? auth.currentUser.email : "Unbekannt";
+        await db.ref('auditLog').push({ timestamp: new Date().toISOString(), user, action, machine, detail });
+    }
+
     async function handleAuthAction() {
         const email = document.getElementById('mEmail').value, pass = document.getElementById('mPass').value;
         try {
             if(isReg) {
-                if(document.getElementById('mInvite').value !== state.config.inviteCode) return alert("Falscher Einladungscode!");
+                if(document.getElementById('mInvite').value !== state.config.inviteCode) return alert("Code falsch!");
                 await auth.createUserWithEmailAndPassword(email, pass);
-            } else {
-                await auth.signInWithEmailAndPassword(email, pass);
-            }
+            } else { await auth.signInWithEmailAndPassword(email, pass); }
             closeModals();
         } catch(e) { alert(e.message); }
     }
@@ -123,11 +148,23 @@
     async function safeSave(key, val) {
         if(!auth.currentUser) return alert("Bitte erst einloggen!");
         if(prompt("Admin Passwort zur Bestätigung:") !== state.config.AdminPW) {
-            alert("Code falsch!");
-            updateUI();
-            return;
+            alert("Code falsch!"); updateUI(); return;
         }
         await db.ref(`dashboardAssignments/${key}`).set(val);
+        writeLog("Einsteller Zuweisung", key, `Neuer Einsteller: ${val}`);
+    }
+
+    async function exportAuditLog() {
+        if(prompt("Admin Passwort für Export:") !== state.config.AdminPW) return alert("Keine Berechtigung!");
+        const snapshot = await db.ref('auditLog').once('value');
+        const logs = snapshot.val();
+        if(!logs) return alert("Keine Daten.");
+        let csv = "\ufeffZeitstempel;Benutzer;Aktion;Maschine;Details\n";
+        Object.values(logs).forEach(l => { csv += `${l.timestamp};${l.user};${l.action};${l.machine};${l.detail}\n`; });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        link.setAttribute("download", `Wartung_Log_${new Date().toLocaleDateString()}.csv`);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
 
     function updateUI() {
@@ -141,36 +178,28 @@
         const data = raw.cloudRawData.map(item => {
             const sId = item.StationNo || item.STATIONNO;
             const cIdx = raw.extraCycles?.[sId] || 0;
-            let ist, target, pkgStr;
-
+            let ist, target, pkg;
             if(pre==='A') { 
-                ist = (parseInt(item.Parts) || 0) - (raw.agieOffsets?.[sId] || 0); 
-                target = 16000 + (cIdx * 16000); 
-                pkgStr = AGIE_PKGS[Math.min(cIdx, AGIE_PKGS.length - 1)]; 
+                ist = (parseInt(item.Parts)||0) - (raw.agieOffsets?.[sId]||0); 
+                target = 16000 + (cIdx * 16000);
+                pkg = AGIE_PKGS[Math.min(cIdx, AGIE_PKGS.length-1)];
+            } else if(pre==='U') {
+                ist = parseInt(item["COUNT(*)"]||0);
+                const tObj = UNO_STEPS[cIdx] || { total: 104000+((cIdx-18)*5000), pkg: "Folge" };
+                target = tObj.total; pkg = tObj.pkg;
+            } else {
+                ist = (parseInt(item.Parts)||0) + (raw.manualOffsets?.[sId]||0);
+                target = 156000 * (cIdx + 1);
+                pkg = (cIdx % 4 === 0) ? "P 6/7/12" : "Wartung";
             }
-            else if(pre==='U') { 
-                ist = parseInt(item["COUNT(*)"] || 0); 
-                const tObj = UNO_STEPS[cIdx] || { total: 104000 + ((cIdx - 18) * 5000), pkg: "Folge" };
-                target = tObj.total;
-                pkgStr = tObj.pkg;
-            }
-            else { 
-                ist = (parseInt(item.Parts) || 0) + (raw.manualOffsets?.[sId] || 0); 
-                target = 156000 * (cIdx + 1); 
-                pkgStr = (cIdx % 4 === 0) ? "P 6/7/12" : "Wartung"; 
-            }
-            
-            return { id:pre+sId, rest: target-ist, key:pre+sId, pkg: pkgStr };
+            return { id:pre+sId, rest: target-ist, key:pre+sId, pkg };
         }).filter(m => m.rest < warn).sort((a,b) => a.rest - b.rest);
 
         document.getElementById(cId).innerText = data.length;
         document.getElementById(id).innerHTML = data.map(m => `
             <div class="card ${m.rest<=0?'overdue':(m.rest<crit?'critical':'warning')}">
                 <div class="card-info">
-                    <div>
-                        <div class="m-id">${m.id}</div>
-                        <div class="m-paket">${m.pkg}</div>
-                    </div>
+                    <div><div class="m-id">${m.id}</div><div class="m-paket">${m.pkg}</div></div>
                     <div class="m-rest">${m.rest.toLocaleString()}</div>
                 </div>
                 <select ${!auth.currentUser?'disabled':''} onchange="safeSave('${m.key}', this.value)">
@@ -180,8 +209,9 @@
             </div>`).join('');
     }
 
+    function openHelpModal() { document.getElementById('helpModal').style.display='flex'; }
     function openLoginModal() { if(auth.currentUser) auth.signOut(); else document.getElementById('loginModal').style.display='flex'; }
-    function closeModals() { document.getElementById('loginModal').style.display='none'; }
+    function closeModals() { document.getElementById('loginModal').style.display='none'; document.getElementById('helpModal').style.display='none'; }
     function toggleM() { isReg=!isReg; document.getElementById('regExtra').style.display=isReg?'block':'none'; }
     function openAdminModal() {
         if(prompt("Admin PW:") === state.config.AdminPW) {
