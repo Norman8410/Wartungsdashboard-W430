@@ -26,41 +26,30 @@
 <header>
     <div style="display:flex; align-items:center; gap:15px;">
         <div class="bosch-logo">BOSCH</div>
-        <div style="font-weight:bold; color:#555;">Agie Wartungsübersicht</div>
+        <div style="font-weight:bold; color:#555;">Agie Wartung</div>
     </div>
     <button class="nav-btn" onclick="window.close()">❌ Fenster schließen</button>
 </header>
 
 <div class="main-container">
     <div class="sidebar" id="machineList"></div>
-    <div class="content">
-        <canvas id="mainChart"></canvas>
-    </div>
+    <div class="content"><canvas id="mainChart"></canvas></div>
 </div>
 
 <script>
-    const firebaseConfig = { 
-        apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", 
-        authDomain: "bosch-agie-wartung.firebaseapp.com", 
-        databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", 
-        projectId: "bosch-agie-wartung" 
-    };
+    const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database(), auth = firebase.auth();
-
     const AGIE_PKGS = ["P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/5", "P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/6/7", "P1/2"];
     let state = { cloudRawData: [], extraCycles: {}, agieOffsets: {} };
 
-    // Zentrales Logging
     async function writeLog(action, machine, detail) {
         const user = auth.currentUser ? auth.currentUser.email : "Unbekannt";
         await db.ref('auditLog').push({ timestamp: new Date().toISOString(), user, action, machine, detail });
     }
 
-    // Wartet nur auf Signal vom Dashboard
-    auth.onAuthStateChanged(user => {
-        if(!user) window.close();
-    });
+    // Schließt das Fenster NUR, wenn das Dashboard ausloggt
+    auth.onAuthStateChanged(user => { if(!user) window.close(); });
 
     db.ref('maintenanceState').on('value', s => {
         const val = s.val() || {};
@@ -84,36 +73,32 @@
 
         document.getElementById('machineList').innerHTML = data.map(d => `
             <div class="card" style="border-left-color:${d.color}">
-                <div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:5px;">
-                    <span>Maschine A${d.id}</span>
-                    <span style="color:${d.color}">${d.rest.toLocaleString()}</span>
-                </div>
-                <span style="font-size:0.8em; color:var(--bosch-red); font-weight:bold; display:block; margin-bottom:8px;">Paket: ${AGIE_PKGS[Math.min(d.cIdx, AGIE_PKGS.length-1)]}</span>
-                <div style="display:flex; align-items:center; gap:10px;">
+                <div style="display:flex; justify-content:space-between; font-weight:bold;"><span>A${d.id}</span><span style="color:${d.color}">${d.rest.toLocaleString()}</span></div>
+                <small style="color:var(--bosch-red); font-weight:bold;">Paket: ${AGIE_PKGS[Math.min(d.cIdx, AGIE_PKGS.length-1)]}</small>
+                <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
                     <button class="nav-btn" onclick="changeCycle('${d.id}', -1)">-</button>
-                    <b style="font-size:1.1em;">${d.cIdx}</b>
+                    <b>${d.cIdx}</b>
                     <button class="nav-btn" onclick="changeCycle('${d.id}', 1)">+</button>
-                    <button class="nav-btn" style="margin-left:auto; font-size:0.8em;" onclick="wpReset('${d.id}')">🔄 Reset</button>
+                    <button class="nav-btn" style="margin-left:auto; font-size:0.7em;" onclick="wpReset('${d.id}')">🔄 Reset</button>
                 </div>
             </div>`).join('');
         renderChart(data);
     }
 
     async function changeCycle(id, val) {
-        const current = state.extraCycles[id] || 0;
-        const newVal = Math.max(0, current + val);
+        const newVal = Math.max(0, (state.extraCycles[id] || 0) + val);
         await db.ref(`maintenanceState/extraCycles/${id}`).set(newVal);
-        writeLog("Zyklus Änderung", "A"+id, `Von ${current} auf ${newVal}`);
+        writeLog("Zyklus Änderung", "A"+id, `Auf ${newVal}`);
     }
 
     async function wpReset(id) {
         const configSnap = await db.ref('config').once('value');
-        if(prompt("Admin Passwort:") === configSnap.val()?.AdminPW) {
+        if(prompt("Admin PW:") === configSnap.val()?.AdminPW) {
             const newOffset = (state.agieOffsets[id] || 0) + 208000;
             await db.ref(`maintenanceState/agieOffsets/${id}`).set(newOffset);
             await db.ref(`maintenanceState/extraCycles/${id}`).set(0);
-            writeLog("Full Reset", "A"+id, `Offset erhöht auf ${newOffset}`);
-            alert("Reset erfolgt!");
+            writeLog("Full Reset", "A"+id, `Neu: ${newOffset}`);
+            alert("Reset ok!");
         }
     }
 
@@ -121,23 +106,9 @@
         const ctx = document.getElementById('mainChart').getContext('2d');
         if(window.myChart) window.myChart.destroy();
         window.myChart = new Chart(ctx, {
-            type: 'bar',
-            plugins: [ChartDataLabels],
-            data: {
-                labels: data.map(d => "A"+d.id),
-                datasets: [{
-                    data: data.map(d => d.rest),
-                    backgroundColor: data.map(d => d.color),
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    datalabels: { anchor: 'end', align: 'top', formatter: (v) => v.toLocaleString() }
-                }
-            }
+            type: 'bar', plugins: [ChartDataLabels],
+            data: { labels: data.map(d => "A"+d.id), datasets: [{ data: data.map(d => d.rest), backgroundColor: data.map(d => d.color) }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false}, datalabels: {anchor:'end', align:'top', formatter:v=>v.toLocaleString()} } }
         });
     }
 </script>
