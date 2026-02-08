@@ -12,37 +12,25 @@
             --bosch-green: #008a4f; --bosch-gray: #eff1f2; --bosch-dark-red: #8b0000;
         }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
-        
-        /* Header & Top Bar */
         .top-bar { height: 10px; background: linear-gradient(90deg, #d50000 0%, #d50000 25%, #003a6c 25%, #003a6c 50%, #00b5e2 50%, #00b5e2 75%, #008a4f 75%, #008a4f 100%); }
         .header { background: white; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        
-        /* Dashboard Layout */
         .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding: 20px; flex: 1; overflow: hidden; }
         .column { background: white; border-top: 5px solid var(--bosch-blue); display: flex; flex-direction: column; overflow: hidden; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .col-header { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-weight: bold; font-size: 1.2em; display: flex; justify-content: space-between; }
         .machine-list { flex: 1; overflow-y: auto; padding: 10px; }
-
-        /* Machine Cards */
-        .card { padding: 12px; border-bottom: 1px solid #eee; border-left: 8px solid #ccc; margin-bottom: 8px; background: #fff; transition: 0.2s; }
+        .card { padding: 12px; border-bottom: 1px solid #eee; border-left: 8px solid #ccc; margin-bottom: 8px; background: #fff; }
         .card.warning { border-left-color: #ffa500; }
         .card.critical { border-left-color: var(--bosch-red); animation: pulse 2s infinite; }
         .card.overdue { border-left-color: var(--bosch-dark-red); animation: pulse 1s infinite; }
-        
         .card-info { display: flex; justify-content: space-between; margin-bottom: 8px; }
         .m-name { font-weight: bold; font-size: 1.1em; }
-        .m-rest { font-weight: bold; }
-        
-        select { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 2px; font-size: 0.9em; background: #fdfdfd; }
-
-        /* UI Elements */
+        select { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 2px; }
         .nav-btn { padding: 8px 15px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; color: var(--bosch-blue); border-radius: 2px; }
         .btn-primary { background: var(--bosch-blue); color: white; border: none; }
-        
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 4000; }
-        .modal-box { background: white; padding: 30px; border-top: 8px solid var(--bosch-red); width: 400px; }
-        textarea { width: 100%; height: 150px; margin: 10px 0; padding: 10px; box-sizing: border-box; }
-
+        .modal-box { background: white; padding: 30px; border-top: 8px solid var(--bosch-red); width: 400px; text-align: center; }
+        input { width: 90%; padding: 10px; margin: 10px 0; }
+        textarea { width: 100%; height: 150px; margin: 10px 0; }
         @keyframes pulse { 0% { background: #fff; } 50% { background: #fff0f0; } 100% { background: #fff; } }
     </style>
 </head>
@@ -52,157 +40,139 @@
 <div class="header">
     <div>
         <span style="color:var(--bosch-red);font-weight:900;font-size:24px;">BOSCH</span> 
-        <span style="font-weight:bold;color:#555;margin-left:10px;">Wartungs-Übersicht</span>
+        <span style="font-weight:bold;color:#555;margin-left:10px;">Zentral-Dashboard</span>
     </div>
-    <button class="nav-btn" onclick="openEinstellerModal()">⚙️ Einsteller bearbeiten</button>
+    <div>
+        <button id="authBtn" class="nav-btn" onclick="openLoginModal()">🔑 Login</button>
+        <button class="nav-btn" onclick="openEinstellerModal()">⚙️ Einsteller bearbeiten</button>
+    </div>
 </div>
 
-<div class="dashboard-grid">
-    <div class="column" style="border-top-color: var(--bosch-blue);">
-        <div class="col-header">Agie <span id="count-agie" style="font-size: 0.8em; color: #666;">0</span></div>
-        <div class="machine-list" id="list-agie"></div>
-    </div>
+<div class="dashboard-grid" id="mainDashboard" style="display:none;">
+    <div class="column"><div class="col-header">Agie <span id="count-agie">0</span></div><div class="machine-list" id="list-agie"></div></div>
+    <div class="column" style="border-top-color: var(--bosch-green);"><div class="col-header">Unotron <span id="count-uno">0</span></div><div class="machine-list" id="list-uno"></div></div>
+    <div class="column" style="border-top-color: var(--bosch-light-blue);"><div class="col-header">HE <span id="count-he">0</span></div><div class="machine-list" id="list-he"></div></div>
+</div>
 
-    <div class="column" style="border-top-color: var(--bosch-green);">
-        <div class="col-header">Unotron <span id="count-uno" style="font-size: 0.8em; color: #666;">0</span></div>
-        <div class="machine-list" id="list-uno"></div>
-    </div>
-
-    <div class="column" style="border-top-color: var(--bosch-light-blue);">
-        <div class="col-header">HE <span id="count-he" style="font-size: 0.8em; color: #666;">0</span></div>
-        <div class="machine-list" id="list-he"></div>
+<div id="loginModal" class="modal">
+    <div class="modal-box">
+        <h3>Anmeldung</h3>
+        <input type="email" id="loginEmail" placeholder="E-Mail">
+        <input type="password" id="loginPass" placeholder="Passwort">
+        <button class="nav-btn btn-primary" style="width:100%" onclick="login()">Einloggen</button>
+        <p onclick="closeModal('loginModal')" style="cursor:pointer; font-size:12px; margin-top:10px;">Abbrechen</p>
     </div>
 </div>
 
 <div id="einstellerModal" class="modal">
     <div class="modal-box">
-        <h3>Einsteller Liste bearbeiten</h3>
-        <p style="font-size: 0.8em; color: #666;">Ein Name pro Zeile eingeben:</p>
+        <h3>Einsteller Liste</h3>
         <textarea id="einstellerTextarea"></textarea>
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-            <button class="nav-btn" onclick="closeModal()">Abbrechen</button>
-            <button class="nav-btn btn-primary" onclick="saveEinsteller()">Speichern</button>
-        </div>
+        <button class="nav-btn btn-primary" onclick="saveEinsteller()">Speichern</button>
+        <button class="nav-btn" onclick="closeModal('einstellerModal')">Schließen</button>
     </div>
 </div>
 
 <script>
-    // Konfiguration (Daten aus deinen Vorlagen übernommen)
     const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung", storageBucket: "bosch-agie-wartung.firebasestorage.app", messagingSenderId: "211606405555", appId: "1:211606405555:web:cc2475ca47804086a3cbc6" };
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    const db = firebase.database(), auth = firebase.auth();
 
     const UNO_STEPS = [{total:2000},{total:4000},{total:10000},{total:14000},{total:18000},{total:26000},{total:28000},{total:30000},{total:34000},{total:42000},{total:50000},{total:56000},{total:58000},{total:66000},{total:74000},{total:82000},{total:90000},{total:98000},{total:104000}];
-    
-    let globalEinsteller = [];
-    let assignments = {};
-    let configData = {};
+    let state = { agie: {}, uno: {}, he: {}, config: {}, assignments: {} };
 
-    // 1. Einsteller & Config laden
-    db.ref('config').on('value', snap => {
-        configData = snap.val() || {};
-        globalEinsteller = configData.einstellerListe || [];
-        updateAllLists();
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            document.getElementById('authBtn').innerText = "🔓 Logout";
+            document.getElementById('mainDashboard').style.display = 'grid';
+            startListening();
+        } else {
+            document.getElementById('authBtn').innerText = "🔑 Login";
+            document.getElementById('mainDashboard').style.display = 'none';
+        }
     });
 
-    db.ref('dashboardAssignments').on('value', snap => {
-        assignments = snap.val() || {};
-        updateAllLists();
-    });
-
-    // 2. Datenüberwachung für alle 3 Bereiche
-    let rawAgie = [], rawUno = [], rawHE = [];
-
-    db.ref('maintenanceState').on('value', snap => { rawAgie = snap.val() || {}; updateAllLists(); });
-    db.ref('maintenanceStateUnotron').on('value', snap => { rawUno = snap.val() || {}; updateAllLists(); });
-    db.ref('maintenanceStateHE').on('value', snap => { rawHE = snap.val() || {}; updateAllLists(); });
-
-    function updateAllLists() {
-        processAgie();
-        processUnotron();
-        processHE();
+    function startListening() {
+        db.ref('config').on('value', s => { state.config = s.val() || {}; updateUI(); });
+        db.ref('dashboardAssignments').on('value', s => { state.assignments = s.val() || {}; updateUI(); });
+        db.ref('maintenanceState').on('value', s => { state.agie = s.val() || {}; updateUI(); });
+        db.ref('maintenanceStateUnotron').on('value', s => { state.uno = s.val() || {}; updateUI(); });
+        db.ref('maintenanceStateHE').on('value', s => { state.he = s.val() || {}; updateUI(); });
     }
 
-    function getStatusClass(rest, warnLimit) {
-        if (rest <= 0) return 'overdue';
-        if (rest < 500) return 'critical';
-        if (rest < warnLimit) return 'warning';
-        return 'ok';
+    async function login() {
+        try {
+            await auth.signInWithEmailAndPassword(document.getElementById('loginEmail').value, document.getElementById('loginPass').value);
+            closeModal('loginModal');
+        } catch(e) { alert("Login fehlgeschlagen: " + e.message); }
     }
 
-    function processAgie() {
-        if(!rawAgie.cloudRawData) return;
-        const data = rawAgie.cloudRawData.map(item => {
+    function updateUI() {
+        renderAgie();
+        renderUno();
+        renderHE();
+    }
+
+    function renderAgie() {
+        if(!state.agie.cloudRawData) return;
+        const data = state.agie.cloudRawData.map(item => {
             const id = item.StationNo;
-            const ist = (parseInt(item.Parts) || 0) - (rawAgie.agieOffsets?.[id] || 0);
-            const cycles = rawAgie.extraCycles?.[id] || 0;
+            const ist = (parseInt(item.Parts) || 0) - (state.agie.agieOffsets?.[id] || 0);
+            const cycles = state.agie.extraCycles?.[id] || 0;
             const rest = (16000 + (cycles * 16000)) - ist;
-            return { id: 'A'+id, rest, type: 'Agie', warnLimit: 2000, dbKey: 'A'+id };
-        }).filter(m => m.rest < 2000);
-        renderColumn('list-agie', 'count-agie', data);
+            return { id: 'A'+id, rest, limit: 2000, key: 'A'+id };
+        }).filter(m => m.rest < 2000).sort((a,b) => a.rest - b.rest);
+        drawList('list-agie', 'count-agie', data);
     }
 
-    function processUnotron() {
-        if(!rawUno.cloudRawData) return;
-        const data = rawUno.cloudRawData.map(item => {
+    function renderUno() {
+        if(!state.uno.cloudRawData) return;
+        const data = state.uno.cloudRawData.map(item => {
             const id = item.STATIONNO;
             const ist = parseInt(item["COUNT(*)"] || 0);
-            const cIdx = rawUno.extraCycles?.[id] || 0;
+            const cIdx = state.uno.extraCycles?.[id] || 0;
             const target = UNO_STEPS[cIdx]?.total || (104000 + ((cIdx-18)*5000));
-            const rest = target - ist;
-            return { id: 'UNO-'+id, rest, type: 'Uno', warnLimit: 2000, dbKey: 'U'+id };
-        }).filter(m => m.rest < 2000);
-        renderColumn('list-uno', 'count-uno', data);
+            return { id: 'UNO-'+id, rest: target - ist, limit: 2000, key: 'U'+id };
+        }).filter(m => m.rest < 2000).sort((a,b) => a.rest - b.rest);
+        drawList('list-uno', 'count-uno', data);
     }
 
-    function processHE() {
-        if(!rawHE.cloudRawData) return;
-        const data = rawHE.cloudRawData.map(item => {
+    function renderHE() {
+        if(!state.he.cloudRawData) return;
+        const data = state.he.cloudRawData.map(item => {
             const id = item.StationNo;
-            const ist = (parseInt(item.Parts) || 0) + (rawHE.manualOffsets?.[id] || 0);
-            const cycles = rawHE.extraCycles?.[id] || 0;
+            const ist = (parseInt(item.Parts) || 0) + (state.he.manualOffsets?.[id] || 0);
+            const cycles = state.he.extraCycles?.[id] || 0;
             const rest = (156000 * (cycles + 1)) - ist;
-            return { id: 'HE'+id, rest, type: 'HE', warnLimit: 15000, dbKey: 'H'+id };
-        }).filter(m => m.rest < 15000);
-        renderColumn('list-he', 'count-he', data);
+            return { id: 'HE'+id, rest, limit: 15000, key: 'H'+id };
+        }).filter(m => m.rest < 15000).sort((a,b) => a.rest - b.rest);
+        drawList('list-he', 'count-he', data);
     }
 
-    function renderColumn(elementId, countId, data) {
-        data.sort((a,b) => a.rest - b.rest);
+    function drawList(elId, countId, data) {
         document.getElementById(countId).innerText = data.length;
-        const container = document.getElementById(elementId);
-        container.innerHTML = data.map(m => `
-            <div class="card ${getStatusClass(m.rest, m.warnLimit)}">
-                <div class="card-info">
-                    <span class="m-name">${m.id}</span>
-                    <span class="m-rest">${m.rest.toLocaleString()}</span>
-                </div>
-                <select onchange="assignWorker('${m.dbKey}', this.value)">
-                    <option value="">-- Einsteller wählen --</option>
-                    ${globalEinsteller.map(e => `<option value="${e}" ${assignments[m.dbKey] === e ? 'selected' : ''}>${e}</option>`).join('')}
+        const einsteller = state.config.einstellerListe || [];
+        document.getElementById(elId).innerHTML = data.map(m => `
+            <div class="card ${m.rest <= 0 ? 'overdue' : (m.rest < 500 ? 'critical' : 'warning')}">
+                <div class="card-info"><span class="m-name">${m.id}</span><b>${m.rest.toLocaleString()}</b></div>
+                <select onchange="db.ref('dashboardAssignments/${m.key}').set(this.value)">
+                    <option value="">-- Einsteller --</option>
+                    ${einsteller.map(e => `<option value="${e}" ${state.assignments[m.key] === e ? 'selected' : ''}>${e}</option>`).join('')}
                 </select>
-            </div>
-        `).join('');
+            </div>`).join('');
     }
 
-    async function assignWorker(id, name) {
-        await db.ref(`dashboardAssignments/${id}`).set(name);
-    }
-
-    // Modal Logik
+    function openLoginModal() { if(auth.currentUser) auth.signOut(); else document.getElementById('loginModal').style.display='flex'; }
     function openEinstellerModal() {
-        const pw = prompt("Admin Passwort erforderlich:");
-        if(pw !== configData.AdminPW) return alert("Falsches Passwort!");
-        document.getElementById('einstellerTextarea').value = globalEinsteller.join('\n');
+        if(prompt("Admin Passwort:") !== state.config.AdminPW) return alert("Falsch!");
+        document.getElementById('einstellerTextarea').value = (state.config.einstellerListe || []).join('\n');
         document.getElementById('einstellerModal').style.display = 'flex';
     }
-
-    function closeModal() { document.getElementById('einstellerModal').style.display = 'none'; }
-
-    async function saveEinsteller() {
-        const list = document.getElementById('einstellerTextarea').value.split('\n').map(n => n.trim()).filter(n => n !== "");
-        await db.ref('config/einstellerListe').set(list);
-        closeModal();
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function saveEinsteller() {
+        const list = document.getElementById('einstellerTextarea').value.split('\n').map(n => n.trim()).filter(n => n);
+        db.ref('config/einstellerListe').set(list);
+        closeModal('einstellerModal');
     }
 </script>
 </body>
