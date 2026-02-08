@@ -2,80 +2,56 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>BOSCH W430 - Central Cockpit V1.3</title>
+    <title>BOSCH W430 - Maintenance Cockpit V1.4</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
         :root { --bosch-red: #d50000; --bosch-dark-red: #8b0000; --bosch-blue: #003a6c; --bosch-green: #008a4f; --bosch-gray: #eff1f2; --bosch-orange: #ffa500; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        /* Drawer Menu */
-        .nav-drawer { position: fixed; left: -280px; top: 0; width: 280px; height: 100%; background: white; box-shadow: 2px 0 15px rgba(0,0,0,0.3); transition: 0.3s ease-in-out; z-index: 3000; padding-top: 20px; }
-        .nav-drawer.open { left: 0; }
-        .drawer-header { padding: 20px; border-bottom: 2px solid var(--bosch-gray); margin-bottom: 10px; }
-        .nav-item { padding: 15px 25px; display: flex; align-items: center; color: #404040; text-decoration: none; font-weight: 600; border-bottom: 1px solid #f0f0f0; transition: 0.2s; }
-        .nav-item:hover { background: #f8f9fa; color: var(--bosch-blue); }
-        .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2500; backdrop-filter: blur(2px); }
-
         .top-bar { height: 45px; background: linear-gradient(90deg, #d50000 0%, #d50000 25%, #003a6c 25%, #003a6c 50%, #00b5e2 50%, #00b5e2 75%, #008a4f 75%, #008a4f 100%); display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; }
         
-        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding: 20px; flex: 1; overflow: hidden; }
-        .col { background: #fdfdfd; border-radius: 5px; display: flex; flex-direction: column; border-top: 8px solid #ccc; box-shadow: 0 4px 10px rgba(0,0,0,0.06); }
-        .col-header { padding: 12px; font-weight: bold; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; color: white; }
-        .col-content { padding: 12px; overflow-y: auto; flex: 1; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; padding: 15px; flex: 1; overflow: hidden; }
+        .col { background: #f4f4f4; border-radius: 4px; display: flex; flex-direction: column; border-top: 6px solid #ccc; overflow: hidden; }
+        .col-header { padding: 10px; font-weight: bold; color: white; text-align: center; font-size: 14px; }
+        .col-content { padding: 10px; overflow-y: auto; flex: 1; }
         
-        .card { background: white; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-left: 10px solid #ccc; border-radius: 3px; position: relative; }
-        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-        .card-id { font-size: 18px; font-weight: bold; color: var(--bosch-blue); }
-        .card-rest { font-size: 20px; font-weight: 900; }
+        /* Cards */
+        .card { background: white; border: 1px solid #ddd; padding: 8px; margin-bottom: 8px; border-left: 8px solid #ccc; border-radius: 3px; }
+        .card-top { display: flex; justify-content: space-between; align-items: center; }
+        .card-id { font-size: 16px; font-weight: bold; color: var(--bosch-blue); }
+        .card-rest { font-size: 18px; font-weight: 900; }
         
-        /* Select Box Styling */
-        .assign-row { display: flex; gap: 5px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 5px; }
-        select.user-select { flex: 1; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 12px; }
-        button.save-btn { background: var(--bosch-blue); color: white; border: none; border-radius: 3px; cursor: pointer; padding: 0 10px; }
-        button.save-btn:hover { background: #002a50; }
-
-        /* Status Colors */
-        .overdue { border-left-color: var(--bosch-dark-red); background: #fff5f5; animation: blink 2s infinite; }
+        /* Status Farben */
+        .overdue { border-left-color: var(--bosch-dark-red); background: #fff0f0; animation: blink 2s infinite; }
         .overdue .card-rest { color: var(--bosch-dark-red); }
-        .crit { border-left-color: #d50000; background: #fffcfc; }
-        .crit .card-rest { color: #d50000; }
+        .crit { border-left-color: var(--bosch-red); }
+        .crit .card-rest { color: var(--bosch-red); }
         .warn { border-left-color: var(--bosch-orange); }
         .warn .card-rest { color: var(--bosch-orange); }
-        
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        .assign-row { display: flex; gap: 4px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 6px; }
+        select { flex: 1; font-size: 12px; padding: 3px; }
+        .save-btn { cursor: pointer; background: var(--bosch-blue); color: white; border: none; padding: 2px 8px; border-radius: 2px; }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
     </style>
 </head>
 <body>
-    
-    <div id="drawerOverlay" class="overlay" onclick="toggleMenu()"></div>
-    <div id="navDrawer" class="nav-drawer">
-        <div class="drawer-header"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Bosch-logo.svg/1024px-Bosch-logo.svg.png" width="120" alt="Bosch"></div>
-        <a href="#" class="nav-item active" style="border-left: 5px solid var(--bosch-red);">🏠 Dashboard (Aktiv)</a>
-        <a href="https://norman8410.github.io/agie-wartung/" class="nav-item">⚡ Agie Wartung</a>
-        <a href="https://norman8410.github.io/unotron-wartung/" class="nav-item">🧪 Unotron</a>
-        <a href="https://norman8410.github.io/HE-Wartung/" class="nav-item">⚙️ HE Wartung</a>
-        <div style="position: absolute; bottom: 20px; left: 25px; font-size: 11px; color: #999;">Verantwortlich: Norman Schultheis</div>
-    </div>
 
-    <div class="top-bar">
-        <span style="font-size:24px; cursor:pointer; margin-right:15px;" onclick="toggleMenu()">☰</span>
-        BOSCH W430 MAINTENANCE COCKPIT
-    </div>
+    <div class="top-bar">BOSCH W430 - CENTRAL MAINTENANCE DASHBOARD</div>
     
     <div class="grid">
         <div class="col" style="border-top-color: var(--bosch-blue)">
-            <div class="col-header" style="background: var(--bosch-blue)">⚡ AGIE (Prio)</div>
+            <div class="col-header" style="background: var(--bosch-blue)">⚡ AGIE</div>
             <div id="lAgie" class="col-content"></div>
         </div>
-        
         <div class="col" style="border-top-color: var(--bosch-green)">
-            <div class="col-header" style="background: var(--bosch-green)">🧪 UNOTRON (Prio)</div>
+            <div class="col-header" style="background: var(--bosch-green)">🧪 UNOTRON</div>
             <div id="lUno" class="col-content"></div>
         </div>
-        
         <div class="col" style="border-top-color: var(--bosch-dark-red)">
-            <div class="col-header" style="background: var(--bosch-red)">⚙️ HE (Prio)</div>
+            <div class="col-header" style="background: var(--bosch-red)">⚙️ HE-ANLAGEN</div>
             <div id="lHe" class="col-content"></div>
         </div>
     </div>
@@ -94,132 +70,86 @@
         const db = firebase.database();
         
         let configData = {};
-        let registeredUsers = [];
+        let userList = [];
 
-        // 1. Config laden
-        db.ref('config').on('value', snap => { configData = snap.val() || {}; });
-
-        // 2. User laden (Für Dropdown)
-        db.ref('users').on('value', snap => {
-            registeredUsers = [];
-            snap.forEach(child => {
-                const u = child.val();
-                if(u.name) registeredUsers.push({ id: child.key, name: u.name });
-            });
-            load(); // Refresh UI wenn neue User kommen
+        // Daten laden
+        db.ref('config').on('value', s => configData = s.val() || {});
+        db.ref('users').on('value', s => {
+            userList = [];
+            s.forEach(c => { if(c.val().name) userList.push(c.val().name); });
+            renderAll();
         });
 
-        const INT_AGIE = 16000;
-        const INT_HE = 156000;
+        const AGIE_INT = 16000;
+        const HE_INT = 156000;
         const UNO_STEPS = [2000, 4000, 10000, 14000, 18000, 26000, 28000, 30000, 34000, 42000, 50000, 56000, 58000, 66000, 74000, 82000, 90000, 98000, 104000];
-        
-        function toggleMenu() { document.getElementById('navDrawer').classList.toggle('open'); document.getElementById('drawerOverlay').style.display = document.getElementById('navDrawer').classList.contains('open') ? 'block' : 'none'; }
 
-        // Speichern der Zuweisung
         async function saveAssign(path, id) {
-            if(!configData.TelPW) return alert("System lädt noch...");
-            
-            const selectBox = document.getElementById(`sel_${path}_${id}`);
-            const selectedName = selectBox.value;
-
-            if(selectedName === "") {
-                if(!confirm("Möchtest du die Zuweisung entfernen?")) return;
-            }
-
-            const pw = prompt("Bitte TelPW eingeben zum Speichern:");
+            const name = document.getElementById(`sel_${path}_${id}`).value;
+            const pw = prompt("TelPW eingeben:");
             if(pw === configData.TelPW) {
-                if(selectedName === "") {
-                    await db.ref(path + '/assignments/' + id).remove();
-                } else {
-                    await db.ref(path + '/assignments/' + id).set({ name: selectedName, time: new Date().toLocaleString() });
-                }
+                await db.ref(`${path}/assignments/${id}`).set({ name, time: new Date().toLocaleString() });
                 alert("Gespeichert!");
-            } else {
-                alert("Falsches Passwort!");
-            }
+            } else { alert("Falsch!"); }
         }
 
-        async function load() {
+        function buildHTML(snap, path, interval, warn, crit) {
+            const d = snap.val() || {};
+            const raw = d.cloudRawData || [];
+            const assigns = d.assignments || {};
+            let cards = [];
+
+            raw.forEach(m => {
+                const id = m.StationNo || m.STATIONNO || m.ID;
+                const ist = (parseInt(m.Parts || m.PARTS || m['COUNT(*)']) || 0) + (d.manualOffsets?.[id] || 0) - (d.agieOffsets?.[id] || 0);
+                const c = d.extraCycles?.[id] || 0;
+                
+                let target = Array.isArray(interval) ? (interval[c] || 104000) : (c + 1) * interval;
+                let rest = target - ist;
+                
+                let status = "";
+                let score = 0; // Für Sortierung
+                if(rest <= 0) { status = "overdue"; score = 3; }
+                else if(rest < crit) { status = "crit"; score = 2; }
+                else if(rest < warn) { status = "warn"; score = 1; }
+
+                if(status !== "") {
+                    const currentAssign = assigns[id]?.name || "";
+                    let options = `<option value="">-- Frei --</option>`;
+                    userList.forEach(u => options += `<option value="${u}" ${u===currentAssign?'selected':''}>${u}</option>`);
+
+                    cards.push({
+                        score, rest, html: `
+                        <div class="card ${status}">
+                            <div class="card-top">
+                                <div class="card-id">#${id}</div>
+                                <div class="card-rest">${rest.toLocaleString()}</div>
+                            </div>
+                            <div class="assign-row">
+                                <select id="sel_${path}_${id}">${options}</select>
+                                <button class="save-btn" onclick="saveAssign('${path}', '${id}')">💾</button>
+                            </div>
+                        </div>`
+                    });
+                }
+            });
+            return cards.sort((a,b) => b.score - a.score || a.rest - b.rest).map(c => c.html).join('');
+        }
+
+        async function renderAll() {
             const [sA, sH, sU] = await Promise.all([
                 db.ref('maintenanceState').once('value'),
                 db.ref('maintenanceStateHE').once('value'),
                 db.ref('maintenanceStateUnotron').once('value')
             ]);
 
-            // Generiere Dropdown-Optionen HTML
-            const getUserOptions = (currentName) => {
-                let opts = `<option value="">-- Frei --</option>`;
-                if(registeredUsers.length === 0) return `<option value="">Keine User in DB</option>`;
-                
-                registeredUsers.forEach(u => {
-                    const sel = (currentName === u.name) ? "selected" : "";
-                    opts += `<option value="${u.name}" ${sel}>${u.name}</option>`;
-                });
-                return opts;
-            };
-
-            const buildList = (snap, pathName, interval, warnLimit, critLimit) => {
-                let items = [];
-                const d = snap.val() || {};
-                const assigns = d.assignments || {};
-                
-                (d.cloudRawData || []).forEach(m => {
-                    const id = m.StationNo || m.STATIONNO;
-                    const ist = (parseInt(m.Parts || m.PARTS || m['COUNT(*)']) || 0) + ((d.manualOffsets || {})[id] || 0) - ((d.agieOffsets || {})[id] || 0);
-                    const c = (d.extraCycles || {})[id] || 0;
-                    
-                    let target, prev = 0;
-                    if(Array.isArray(interval)) { 
-                        prev = c > 0 ? interval[c-1] : 0; target = interval[c] || 104000; 
-                    } else { 
-                        target = (c + 1) * interval; prev = c * interval; 
-                    }
-                    
-                    const rest = target - ist;
-                    let status = null;
-                    
-                    // Priorisierung Logik
-                    if (rest <= 0) status = 'overdue';      // Dunkelrot blinkend
-                    else if (rest < critLimit) status = 'crit'; // Rot
-                    else if (rest < warnLimit) status = 'warn'; // Gelb
-
-                    if (status) {
-                        const assignedName = assigns[id] ? assigns[id].name : "";
-                        items.push({ id, rest, status, assignedName, pathName });
-                    }
-                });
-
-                // Sortieren: Overdue zuerst, dann wenigste Reststücke
-                items.sort((a,b) => a.rest - b.rest);
-
-                return items.map(item => `
-                    <div class="card ${item.status}">
-                        <div class="card-top">
-                            <div class="card-id">#${item.id}</div>
-                            <div class="card-rest">${item.rest.toLocaleString()}</div>
-                        </div>
-                        <div class="assign-row">
-                            <select id="sel_${item.pathName}_${item.id}" class="user-select">
-                                ${getUserOptions(item.assignedName)}
-                            </select>
-                            <button class="save-btn" onclick="saveAssign('${item.pathName}', '${item.id}')">💾</button>
-                        </div>
-                        ${item.assignedName ? `<div style="font-size:10px; color:#666; margin-top:2px;">Zuletzt: ${item.assignedName}</div>` : ''}
-                    </div>
-                `).join('');
-            };
-
-            // Limits definieren:
-            // Agie: <2000 (Gelb), <500 (Rot), <=0 (Dunkelrot)
-            // HE: <15000 (Gelb), <5000 (Rot), <=0 (Dunkelrot)
-            // Unotron: <2000 (Gelb), <500 (Rot), <=0 (Dunkelrot)
-
-            document.getElementById('lAgie').innerHTML = buildList(sA, 'maintenanceState', INT_AGIE, 2000, 500);
-            document.getElementById('lHe').innerHTML = buildList(sH, 'maintenanceStateHE', INT_HE, 15000, 5000);
-            document.getElementById('lUno').innerHTML = buildList(sU, 'maintenanceStateUnotron', UNO_STEPS, 2000, 500);
+            document.getElementById('lAgie').innerHTML = buildHTML(sA, 'maintenanceState', AGIE_INT, 2000, 500);
+            document.getElementById('lHe').innerHTML = buildHTML(sH, 'maintenanceStateHE', HE_INT, 15000, 5000);
+            document.getElementById('lUno').innerHTML = buildHTML(sU, 'maintenanceStateUnotron', UNO_STEPS, 2000, 500);
         }
-        
-        load(); setInterval(load, 10000);
+
+        setInterval(renderAll, 30000);
+        renderAll();
     </script>
 </body>
 </html>
