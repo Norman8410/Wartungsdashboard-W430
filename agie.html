@@ -20,30 +20,52 @@
         .nav-btn { padding: 6px 12px; cursor: pointer; border: 1px solid #ccc; background: white; border-radius: 3px; font-weight: bold; color: var(--bosch-blue); }
     </style>
 </head>
-<body onmousedown="if(window.opener && window.opener.resetInactivityTimer) window.opener.resetInactivityTimer()" onkeydown="if(window.opener && window.opener.resetInactivityTimer) window.opener.resetInactivityTimer()">
+<body onmousedown="if(window.opener && window.opener.resetInactivityTimer) window.opener.resetInactivityTimer()" 
+      onkeydown="if(window.opener && window.opener.resetInactivityTimer) window.opener.resetInactivityTimer()">
+
 <header>
     <div style="display:flex; align-items:center; gap:15px;">
         <div class="bosch-logo">BOSCH</div>
         <div style="font-weight:bold; color:#555;">Agie Wartungsübersicht</div>
     </div>
-    <button class="nav-btn" onclick="window.close()">❌ Schließen</button>
+    <button class="nav-btn" onclick="window.close()">❌ Fenster schließen</button>
 </header>
+
 <div class="main-container">
     <div class="sidebar" id="machineList"></div>
-    <div class="content"><canvas id="mainChart"></canvas></div>
+    <div class="content">
+        <canvas id="mainChart"></canvas>
+    </div>
 </div>
+
 <script>
-    const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung" };
+    const firebaseConfig = { 
+        apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", 
+        authDomain: "bosch-agie-wartung.firebaseapp.com", 
+        databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", 
+        projectId: "bosch-agie-wartung" 
+    };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database(), auth = firebase.auth();
+
     const AGIE_PKGS = ["P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/5", "P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/6/7", "P1/2"];
     let state = { cloudRawData: [], extraCycles: {}, agieOffsets: {} };
 
+    // Audit Log Funktion
     async function writeLog(action, machine, detail) {
         const user = auth.currentUser ? auth.currentUser.email : "Unbekannt";
         await db.ref('auditLog').push({ timestamp: new Date().toISOString(), user, action, machine, detail });
     }
 
+    // WICHTIG: Nur schließen wenn User ausgeloggt wird
+    auth.onAuthStateChanged(user => {
+        if(!user) {
+            console.log("Logout erkannt - schließe Fenster.");
+            window.close();
+        }
+    });
+
+    // Daten laden
     db.ref('maintenanceState').on('value', s => {
         const val = s.val() || {};
         state.cloudRawData = val.cloudRawData || [];
@@ -51,8 +73,6 @@
         state.agieOffsets = val.agieOffsets || {};
         updateUI();
     });
-
-    auth.onAuthStateChanged(user => { if(!user) window.close(); });
 
     function updateUI() {
         if (!state.cloudRawData.length) return;
@@ -68,9 +88,12 @@
 
         document.getElementById('machineList').innerHTML = data.map(d => `
             <div class="card" style="border-left-color:${d.color}">
-                <div style="display:flex; justify-content:space-between; font-weight:bold;"><span>A${d.id}</span><span style="color:${d.color}">${d.rest.toLocaleString()}</span></div>
-                <span style="font-size:0.8em; color:var(--bosch-red); font-weight:bold;">Paket: ${AGIE_PKGS[Math.min(d.cIdx, AGIE_PKGS.length-1)]}</span>
-                <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
+                <div style="display:flex; justify-content:space-between; font-weight:bold;">
+                    <span>A${d.id}</span>
+                    <span style="color:${d.color}">${d.rest.toLocaleString()}</span>
+                </div>
+                <span style="font-size:0.85em; color:var(--bosch-red); font-weight:bold; display:block; margin: 4px 0;">Paket: ${AGIE_PKGS[Math.min(d.cIdx, AGIE_PKGS.length-1)]}</span>
+                <div style="display:flex; align-items:center; gap:10px;">
                     <button class="nav-btn" onclick="changeCycle('${d.id}', -1)">-</button>
                     <b>${d.cIdx}</b>
                     <button class="nav-btn" onclick="changeCycle('${d.id}', 1)">+</button>
@@ -89,13 +112,13 @@
 
     async function wpReset(id) {
         const configSnap = await db.ref('config').once('value');
-        if(prompt("Admin Passwort:") === configSnap.val()?.AdminPW) {
+        if(prompt("Admin Passwort für Full-Service-Reset (208k):") === configSnap.val()?.AdminPW) {
             const newOffset = (state.agieOffsets[id] || 0) + 208000;
             await db.ref(`maintenanceState/agieOffsets/${id}`).set(newOffset);
             await db.ref(`maintenanceState/extraCycles/${id}`).set(0);
-            writeLog("Full Reset", "A"+id, `Offset: ${newOffset}`);
+            writeLog("Full Reset", "A"+id, `Offset erhöht auf ${newOffset}`);
             alert("Reset durchgeführt!");
-        }
+        } else { alert("Passwort falsch!"); }
     }
 
     function renderChart(data) {
@@ -103,8 +126,14 @@
         if(window.myChart) window.myChart.destroy();
         window.myChart = new Chart(ctx, {
             type: 'bar', plugins: [ChartDataLabels],
-            data: { labels: data.map(d => "A"+d.id), datasets: [{ data: data.map(d => d.rest), backgroundColor: data.map(d => d.color) }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false}, datalabels: {anchor:'end', align:'top', formatter:v=>v.toLocaleString()} } }
+            data: { 
+                labels: data.map(d => "A"+d.id), 
+                datasets: [{ data: data.map(d => d.rest), backgroundColor: data.map(d => d.color) }] 
+            },
+            options: { 
+                responsive: true, maintainAspectRatio: false, 
+                plugins: { legend: {display:false}, datalabels: {anchor:'end', align:'top', formatter:v=>v.toLocaleString()} } 
+            }
         });
     }
 </script>
