@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>BOSCH W430 - Central Cockpit V1.2</title>
+    <title>BOSCH W430 - Central Cockpit V1.3</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
@@ -15,29 +15,35 @@
         .drawer-header { padding: 20px; border-bottom: 2px solid var(--bosch-gray); margin-bottom: 10px; }
         .nav-item { padding: 15px 25px; display: flex; align-items: center; color: #404040; text-decoration: none; font-weight: 600; border-bottom: 1px solid #f0f0f0; transition: 0.2s; }
         .nav-item:hover { background: #f8f9fa; color: var(--bosch-blue); }
-        .nav-item.active { border-left: 5px solid var(--bosch-red); background: #fdfdfd; color: var(--bosch-red); }
         .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2500; backdrop-filter: blur(2px); }
 
         .top-bar { height: 45px; background: linear-gradient(90deg, #d50000 0%, #d50000 25%, #003a6c 25%, #003a6c 50%, #00b5e2 50%, #00b5e2 75%, #008a4f 75%, #008a4f 100%); display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; }
-        .header { background: white; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .bosch-text { color: #d50000; font-size: 26px; font-weight: 900; letter-spacing: -1px; }
         
         .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding: 20px; flex: 1; overflow: hidden; }
         .col { background: #fdfdfd; border-radius: 5px; display: flex; flex-direction: column; border-top: 8px solid #ccc; box-shadow: 0 4px 10px rgba(0,0,0,0.06); }
         .col-header { padding: 12px; font-weight: bold; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; color: white; }
         .col-content { padding: 12px; overflow-y: auto; flex: 1; }
         
-        .card { background: white; border: 1px solid #ddd; padding: 12px; margin-bottom: 10px; border-left: 10px solid #ccc; border-radius: 3px; position: relative; }
+        .card { background: white; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-left: 10px solid #ccc; border-radius: 3px; position: relative; }
+        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
         .card-id { font-size: 18px; font-weight: bold; color: var(--bosch-blue); }
-        .card-rest { font-size: 16px; font-weight: 900; float: right; }
-        .assign-area { margin-top: 10px; padding-top: 5px; border-top: 1px solid #eee; font-size: 12px; display: flex; justify-content: space-between; align-items: center;}
+        .card-rest { font-size: 20px; font-weight: 900; }
         
-        .crit { border-left-color: var(--bosch-dark-red); background: #fff8f8; animation: blink 2s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+        /* Select Box Styling */
+        .assign-row { display: flex; gap: 5px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 5px; }
+        select.user-select { flex: 1; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 12px; }
+        button.save-btn { background: var(--bosch-blue); color: white; border: none; border-radius: 3px; cursor: pointer; padding: 0 10px; }
+        button.save-btn:hover { background: #002a50; }
+
+        /* Status Colors */
+        .overdue { border-left-color: var(--bosch-dark-red); background: #fff5f5; animation: blink 2s infinite; }
+        .overdue .card-rest { color: var(--bosch-dark-red); }
+        .crit { border-left-color: #d50000; background: #fffcfc; }
+        .crit .card-rest { color: #d50000; }
         .warn { border-left-color: var(--bosch-orange); }
+        .warn .card-rest { color: var(--bosch-orange); }
         
-        button.assign-btn { background: #eee; border: 1px solid #ccc; cursor: pointer; padding: 2px 8px; font-size: 11px; border-radius: 3px; }
-        button.assign-btn:hover { background: #ddd; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
     </style>
 </head>
 <body>
@@ -45,7 +51,7 @@
     <div id="drawerOverlay" class="overlay" onclick="toggleMenu()"></div>
     <div id="navDrawer" class="nav-drawer">
         <div class="drawer-header"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Bosch-logo.svg/1024px-Bosch-logo.svg.png" width="120" alt="Bosch"></div>
-        <a href="index.html" class="nav-item active">🏠 Dashboard (Aktiv)</a>
+        <a href="#" class="nav-item active" style="border-left: 5px solid var(--bosch-red);">🏠 Dashboard (Aktiv)</a>
         <a href="https://norman8410.github.io/agie-wartung/" class="nav-item">⚡ Agie Wartung</a>
         <a href="https://norman8410.github.io/unotron-wartung/" class="nav-item">🧪 Unotron</a>
         <a href="https://norman8410.github.io/HE-Wartung/" class="nav-item">⚙️ HE Wartung</a>
@@ -54,22 +60,22 @@
 
     <div class="top-bar">
         <span style="font-size:24px; cursor:pointer; margin-right:15px;" onclick="toggleMenu()">☰</span>
-        BOSCH W430 MAINTENANCE CONTROL
+        BOSCH W430 MAINTENANCE COCKPIT
     </div>
     
     <div class="grid">
         <div class="col" style="border-top-color: var(--bosch-blue)">
-            <div class="col-header" style="background: var(--bosch-blue)">⚡ AGIE (Warnung/Kritisch) <span id="cAgie">0</span></div>
+            <div class="col-header" style="background: var(--bosch-blue)">⚡ AGIE (Prio)</div>
             <div id="lAgie" class="col-content"></div>
         </div>
         
         <div class="col" style="border-top-color: var(--bosch-green)">
-            <div class="col-header" style="background: var(--bosch-green)">🧪 UNOTRON (Warnung/Kritisch) <span id="cUno">0</span></div>
+            <div class="col-header" style="background: var(--bosch-green)">🧪 UNOTRON (Prio)</div>
             <div id="lUno" class="col-content"></div>
         </div>
         
         <div class="col" style="border-top-color: var(--bosch-dark-red)">
-            <div class="col-header" style="background: var(--bosch-red)">⚙️ HE (Warnung/Kritisch) <span id="cHe">0</span></div>
+            <div class="col-header" style="background: var(--bosch-red)">⚙️ HE (Prio)</div>
             <div id="lHe" class="col-content"></div>
         </div>
     </div>
@@ -88,7 +94,20 @@
         const db = firebase.database();
         
         let configData = {};
+        let registeredUsers = [];
+
+        // 1. Config laden
         db.ref('config').on('value', snap => { configData = snap.val() || {}; });
+
+        // 2. User laden (Für Dropdown)
+        db.ref('users').on('value', snap => {
+            registeredUsers = [];
+            snap.forEach(child => {
+                const u = child.val();
+                if(u.name) registeredUsers.push({ id: child.key, name: u.name });
+            });
+            load(); // Refresh UI wenn neue User kommen
+        });
 
         const INT_AGIE = 16000;
         const INT_HE = 156000;
@@ -96,13 +115,24 @@
         
         function toggleMenu() { document.getElementById('navDrawer').classList.toggle('open'); document.getElementById('drawerOverlay').style.display = document.getElementById('navDrawer').classList.contains('open') ? 'block' : 'none'; }
 
-        async function assignPerson(path, id) {
-            if(!configData.TelPW) return alert("Konfiguration wird noch geladen...");
-            const name = prompt("Name des Verantwortlichen eingeben:");
-            if(!name) return;
-            const pw = prompt("Bitte Telefon-Passwort (TelPW) eingeben zur Bestätigung:");
+        // Speichern der Zuweisung
+        async function saveAssign(path, id) {
+            if(!configData.TelPW) return alert("System lädt noch...");
+            
+            const selectBox = document.getElementById(`sel_${path}_${id}`);
+            const selectedName = selectBox.value;
+
+            if(selectedName === "") {
+                if(!confirm("Möchtest du die Zuweisung entfernen?")) return;
+            }
+
+            const pw = prompt("Bitte TelPW eingeben zum Speichern:");
             if(pw === configData.TelPW) {
-                await db.ref(path + '/assignments/' + id).set({ name: name, time: new Date().toLocaleString() });
+                if(selectedName === "") {
+                    await db.ref(path + '/assignments/' + id).remove();
+                } else {
+                    await db.ref(path + '/assignments/' + id).set({ name: selectedName, time: new Date().toLocaleString() });
+                }
                 alert("Gespeichert!");
             } else {
                 alert("Falsches Passwort!");
@@ -116,8 +146,20 @@
                 db.ref('maintenanceStateUnotron').once('value')
             ]);
 
-            const buildList = (snap, pathName, interval, warnLimit) => {
-                let html = "", count = 0;
+            // Generiere Dropdown-Optionen HTML
+            const getUserOptions = (currentName) => {
+                let opts = `<option value="">-- Frei --</option>`;
+                if(registeredUsers.length === 0) return `<option value="">Keine User in DB</option>`;
+                
+                registeredUsers.forEach(u => {
+                    const sel = (currentName === u.name) ? "selected" : "";
+                    opts += `<option value="${u.name}" ${sel}>${u.name}</option>`;
+                });
+                return opts;
+            };
+
+            const buildList = (snap, pathName, interval, warnLimit, critLimit) => {
+                let items = [];
                 const d = snap.val() || {};
                 const assigns = d.assignments || {};
                 
@@ -135,37 +177,48 @@
                     
                     const rest = target - ist;
                     let status = null;
-                    if (rest <= 0) status = 'crit';
-                    else if (rest < warnLimit) status = 'warn';
+                    
+                    // Priorisierung Logik
+                    if (rest <= 0) status = 'overdue';      // Dunkelrot blinkend
+                    else if (rest < critLimit) status = 'crit'; // Rot
+                    else if (rest < warnLimit) status = 'warn'; // Gelb
 
                     if (status) {
-                        count++;
-                        const assignee = assigns[id] ? `<span style="color:#008a4f">👷 ${assigns[id].name}</span>` : `<span style="color:#999">Niemand</span>`;
-                        html += `
-                        <div class="card ${status}">
-                            <div class="card-rest">${rest.toLocaleString()}</div>
-                            <div class="card-id">#${id}</div>
-                            <div class="assign-area">
-                                ${assignee}
-                                <button class="assign-btn" onclick="assignPerson('${pathName}', '${id}')">Bearbeiten</button>
-                            </div>
-                        </div>`;
+                        const assignedName = assigns[id] ? assigns[id].name : "";
+                        items.push({ id, rest, status, assignedName, pathName });
                     }
                 });
-                return { html, count };
+
+                // Sortieren: Overdue zuerst, dann wenigste Reststücke
+                items.sort((a,b) => a.rest - b.rest);
+
+                return items.map(item => `
+                    <div class="card ${item.status}">
+                        <div class="card-top">
+                            <div class="card-id">#${item.id}</div>
+                            <div class="card-rest">${item.rest.toLocaleString()}</div>
+                        </div>
+                        <div class="assign-row">
+                            <select id="sel_${item.pathName}_${item.id}" class="user-select">
+                                ${getUserOptions(item.assignedName)}
+                            </select>
+                            <button class="save-btn" onclick="saveAssign('${item.pathName}', '${item.id}')">💾</button>
+                        </div>
+                        ${item.assignedName ? `<div style="font-size:10px; color:#666; margin-top:2px;">Zuletzt: ${item.assignedName}</div>` : ''}
+                    </div>
+                `).join('');
             };
 
-            // Limits: Agie < 2000 (Warn), HE < 15000 (Warn), Unotron < 2000 (Warn)
-            const agieRes = buildList(sA, 'maintenanceState', INT_AGIE, 2000);
-            const heRes = buildList(sH, 'maintenanceStateHE', INT_HE, 15000);
-            const unoRes = buildList(sU, 'maintenanceStateUnotron', UNO_STEPS, 2000);
+            // Limits definieren:
+            // Agie: <2000 (Gelb), <500 (Rot), <=0 (Dunkelrot)
+            // HE: <15000 (Gelb), <5000 (Rot), <=0 (Dunkelrot)
+            // Unotron: <2000 (Gelb), <500 (Rot), <=0 (Dunkelrot)
 
-            document.getElementById('lAgie').innerHTML = agieRes.html; document.getElementById('cAgie').innerText = agieRes.count;
-            document.getElementById('lHe').innerHTML = heRes.html; document.getElementById('cHe').innerText = heRes.count;
-            document.getElementById('lUno').innerHTML = unoRes.html; document.getElementById('cUno').innerText = unoRes.count;
+            document.getElementById('lAgie').innerHTML = buildList(sA, 'maintenanceState', INT_AGIE, 2000, 500);
+            document.getElementById('lHe').innerHTML = buildList(sH, 'maintenanceStateHE', INT_HE, 15000, 5000);
+            document.getElementById('lUno').innerHTML = buildList(sU, 'maintenanceStateUnotron', UNO_STEPS, 2000, 500);
         }
         
-        // Live Reload alle 10s und initial
         load(); setInterval(load, 10000);
     </script>
 </body>
