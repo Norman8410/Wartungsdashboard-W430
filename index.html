@@ -2,55 +2,49 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>BOSCH W430 - Central Cockpit V1.5</title>
+    <title>BOSCH W430 - Central Cockpit V1.6</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
         :root { --bosch-red: #d50000; --bosch-dark-red: #8b0000; --bosch-blue: #003a6c; --bosch-green: #008a4f; --bosch-gray: #eff1f2; --bosch-orange: #ffa500; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        
         .top-bar { height: 45px; background: linear-gradient(90deg, #d50000 0%, #d50000 25%, #003a6c 25%, #003a6c 50%, #00b5e2 50%, #00b5e2 75%, #008a4f 75%, #008a4f 100%); display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; }
-        
         .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; padding: 15px; flex: 1; overflow: hidden; }
         .col { background: #eee; border-radius: 4px; display: flex; flex-direction: column; border-top: 6px solid #ccc; overflow: hidden; }
         .col-header { padding: 10px; font-weight: bold; color: white; text-align: center; }
-        .col-content { padding: 10px; overflow-y: auto; flex: 1; }
-        
+        .col-content { padding: 10px; overflow-y: auto; flex: 1; min-height: 50px; }
         .card { background: white; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-left: 8px solid #ccc; border-radius: 3px; }
         .card-top { display: flex; justify-content: space-between; align-items: center; }
         .card-id { font-size: 16px; font-weight: bold; color: var(--bosch-blue); }
         .card-rest { font-size: 18px; font-weight: 900; }
-        
         .overdue { border-left-color: var(--bosch-dark-red); background: #fff0f0; animation: blink 2s infinite; }
         .overdue .card-rest { color: var(--bosch-dark-red); }
         .crit { border-left-color: var(--bosch-red); }
         .crit .card-rest { color: var(--bosch-red); }
         .warn { border-left-color: var(--bosch-orange); }
         .warn .card-rest { color: var(--bosch-orange); }
-
         .assign-row { display: flex; gap: 5px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px; }
         select { flex: 1; font-size: 12px; padding: 4px; border: 1px solid #ccc; }
         .save-btn { cursor: pointer; background: var(--bosch-blue); color: white; border: none; padding: 2px 10px; border-radius: 2px; font-size: 14px; }
-
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
     </style>
 </head>
 <body>
 
-    <div class="top-bar">BOSCH W430 - CENTRAL MAINTENANCE DASHBOARD (FIXED)</div>
+    <div class="top-bar">BOSCH W430 - CENTRAL MAINTENANCE DASHBOARD (V1.6)</div>
     
     <div class="grid">
         <div class="col" style="border-top-color: var(--bosch-blue)">
             <div class="col-header" style="background: var(--bosch-blue)">⚡ AGIE</div>
-            <div id="lAgie" class="col-content"></div>
+            <div id="lAgie" class="col-content">Lade...</div>
         </div>
         <div class="col" style="border-top-color: var(--bosch-green)">
             <div class="col-header" style="background: var(--bosch-green)">🧪 UNOTRON</div>
-            <div id="lUno" class="col-content"></div>
+            <div id="lUno" class="col-content">Lade...</div>
         </div>
         <div class="col" style="border-top-color: var(--bosch-red)">
             <div class="col-header" style="background: var(--bosch-red)">⚙️ HE-ANLAGEN</div>
-            <div id="lHe" class="col-content"></div>
+            <div id="lHe" class="col-content">Lade...</div>
         </div>
     </div>
 
@@ -69,24 +63,23 @@
         
         let configData = {};
         let userNames = [];
-    
-            // Verbesserte User-Abfrage
-            db.ref('users').on('value', s => {
-                userNames = [];
-                if (s.exists()) {
-                    s.forEach(child => {
-                        const data = child.val();
-                        // Wir suchen nach 'name' oder 'displayName'
-                        const name = data.name || data.displayName;
-                        if (name) userNames.push(name);
-                    });
-                    console.log("Benutzer geladen:", userNames);
-                } else {
-                    console.warn("Keine Benutzer unter Pfad 'users' gefunden.");
-                }
-                render(); // Cockpit neu zeichnen
-            }, err => {
-                console.error("Firebase Fehler:", err.message);
+
+        // 1. Config laden
+        db.ref('config').on('value', s => { configData = s.val() || {}; });
+
+        // 2. User laden (mit Fehlerbehandlung)
+        db.ref('users').on('value', s => {
+            userNames = [];
+            if (s.exists()) {
+                s.forEach(c => {
+                    const n = c.val().name || c.val().displayName;
+                    if (n) userNames.push(n);
+                });
+            }
+            render(); 
+        }, err => {
+            console.error("User-Pfad nicht lesbar:", err);
+            render(); // Trotzdem rendern, auch ohne User
         });
 
         const AGIE_INT = 16000;
@@ -99,6 +92,7 @@
             if(pw === configData.TelPW) {
                 await db.ref(`${path}/assignments/${id}`).set({ name: name, time: new Date().toLocaleString() });
                 alert("Zuweisung gespeichert!");
+                render();
             } else { alert("Falsches Passwort!"); }
         }
 
@@ -106,11 +100,10 @@
             const d = snap.val() || {};
             const raw = d.cloudRawData || [];
             const assigns = d.assignments || {};
-            let html = "";
             let items = [];
 
             raw.forEach(m => {
-                const id = m.StationNo || m.STATIONNO || m.ID;
+                const id = m.StationNo || m.STATIONNO || m.ID || "N/A";
                 const ist = (parseInt(m.Parts || m.PARTS || m['COUNT(*)']) || 0) + (d.manualOffsets?.[id] || 0) - (d.agieOffsets?.[id] || 0);
                 const c = d.extraCycles?.[id] || 0;
                 let target = Array.isArray(interval) ? (interval[c] || 104000) : (c + 1) * interval;
@@ -139,21 +132,26 @@
                     });
                 }
             });
+            if(items.length === 0) return `<div style="text-align:center; color:#999; margin-top:20px;">Alles im grünen Bereich</div>`;
             return items.sort((a,b) => b.score - a.score || a.rest - b.rest).map(i => i.code).join('');
         }
 
         async function render() {
-            const [sA, sH, sU] = await Promise.all([
-                db.ref('maintenanceState').once('value'),
-                db.ref('maintenanceStateHE').once('value'),
-                db.ref('maintenanceStateUnotron').once('value')
-            ]);
-            document.getElementById('lAgie').innerHTML = buildCol(sA, 'maintenanceState', AGIE_INT, 2000, 500);
-            document.getElementById('lHe').innerHTML = buildCol(sH, 'maintenanceStateHE', HE_INT, 15000, 5000);
-            document.getElementById('lUno').innerHTML = buildCol(sU, 'maintenanceStateUnotron', UNO_STEPS, 2000, 500);
+            try {
+                const [sA, sH, sU] = await Promise.all([
+                    db.ref('maintenanceState').once('value'),
+                    db.ref('maintenanceStateHE').once('value'),
+                    db.ref('maintenanceStateUnotron').once('value')
+                ]);
+                document.getElementById('lAgie').innerHTML = buildCol(sA, 'maintenanceState', AGIE_INT, 2000, 500);
+                document.getElementById('lHe').innerHTML = buildCol(sH, 'maintenanceStateHE', HE_INT, 15000, 5000);
+                document.getElementById('lUno').innerHTML = buildCol(sU, 'maintenanceStateUnotron', UNO_STEPS, 2000, 500);
+            } catch (e) {
+                console.error("Render Fehler:", e);
+            }
         }
 
-        setInterval(render, 15000);
+        setInterval(render, 30000);
         render();
     </script>
 </body>
