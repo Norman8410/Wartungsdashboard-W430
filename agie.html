@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Agie Wartung - Bosch V1.1 Optimized</title>
+    <title>Agie Wartung - Bosch View</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -12,7 +12,7 @@
     <style>
         :root { 
             --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-light-blue: #00b5e2; 
-            --bosch-green: #008a4f; --bosch-gray: #eff1f2; --critical-red: #8b0000;
+            --bosch-green: #008a4f; --bosch-gray: #eff1f2;
         }
 
         body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
@@ -24,41 +24,23 @@
         .bosch-brand { display: flex; align-items: baseline; gap: 8px; }
         .bosch-text { color: #d50000; font-size: 30px; font-weight: 900; letter-spacing: -1.5px; font-family: 'Arial Black', sans-serif; line-height: 1; }
         
-        /* Layout-Wechsel: Content (Diagramm) LINKS, Sidebar (Tabelle) RECHTS */
-        .main-layout { display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden; flex-direction: row; }
-        .content { flex: 3; background: white; padding: 20px; border-top: 4px solid var(--bosch-blue); order: 1; position: relative; }
-        .sidebar { flex: 1.5; background: white; border-top: 4px solid var(--bosch-light-blue); overflow-y: auto; padding: 10px; order: 2; }
+        /* Layout: Chart LINKS, Sidebar RECHTS */
+        .main-layout { display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden; }
+        .content { flex: 3; background: white; padding: 20px; border-top: 4px solid var(--bosch-blue); position: relative; }
+        .sidebar { width: 350px; background: white; border-top: 4px solid var(--bosch-light-blue); overflow-y: auto; padding: 10px; }
 
-        .control-row { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; border-left: 8px solid #ccc; margin-bottom: 5px; gap: 8px; }
-        .nav-btn { padding: 6px 12px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; color: var(--bosch-blue); font-size: 13px; border-radius: 2px; }
-        .btn-primary { background: var(--bosch-blue); color: white; border: none; }
-        .btn-wp { background: var(--bosch-red); color: white; border: none; font-size: 11px; }
-
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 4000; }
-        .modal-box { background: white; padding: 30px; border-top: 8px solid var(--bosch-red); width: 480px; text-align: center; }
-        input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; border: 1px solid #ddd; }
+        .control-row { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; border-left: 8px solid #ccc; margin-bottom: 5px; gap: 12px; }
+        .nav-btn { padding: 8px 15px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; color: var(--bosch-blue); border-radius: 2px; }
+        .btn-close { background: var(--bosch-red); color: white; border: none; }
     </style>
 </head>
-<body>
-
-    <div id="authModal" class="modal">
-        <div class="modal-box" id="loginContainer">
-            <h2 style="color:var(--bosch-blue)">Anmeldung</h2>
-            <input type="email" id="loginEmail" placeholder="E-Mail">
-            <input type="password" id="loginPass" placeholder="Passwort">
-            <button class="nav-btn btn-primary" style="width:100%" onclick="performLogin()">Einloggen</button>
-            <p onclick="closeModal('authModal')" style="cursor:pointer; font-size:12px; margin-top:15px;">Abbrechen</p>
-        </div>
-    </div>
+<body onmousedown="if(window.opener && window.opener.resetInactivityTimer) window.opener.resetInactivityTimer()">
 
     <div class="top-bar"><div class="bar-title">Wartungsübersicht Agie</div></div>
 
     <div class="header">
         <div class="bosch-brand"><span class="bosch-text">BOSCH</span></div>
-        <div style="display: flex; gap: 10px;">
-            <button id="authBtn" class="nav-btn" onclick="openModal('authModal')">🔑 Login</button>
-            <button id="adminBtn" class="nav-btn" onclick="openAdmin()" style="display:none">⚙️ Admin</button>
-        </div>
+        <button class="nav-btn btn-close" onclick="window.close()">❌ Fenster schließen</button>
     </div>
 
     <div class="main-layout">
@@ -81,6 +63,9 @@
         let state = { cloudRawData: [], extraCycles: {}, agieOffsets: {} };
         let chart = null;
 
+        // Schließt das Fenster automatisch, wenn das Dashboard ausloggt
+        auth.onAuthStateChanged(user => { if(!user) window.close(); });
+
         db.ref('maintenanceState').on('value', snap => {
             const val = snap.val() || {};
             state.cloudRawData = val.cloudRawData || [];
@@ -89,19 +74,11 @@
             updateUI();
         });
 
-        auth.onAuthStateChanged(user => {
-            document.getElementById('authBtn').innerText = user ? "🔓 Logout" : "🔑 Login";
-            document.getElementById('adminBtn').style.display = user ? "inline-block" : "none";
-            updateUI();
-        });
-
         function updateUI() {
             const packages = ["P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/5", "P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/6/7", "P1/2"];
             const data = state.cloudRawData.map(item => {
                 const id = item.StationNo;
-                const totalParts = parseInt(item.Parts) || 0;
-                const offset = state.agieOffsets[id] || 0;
-                const ist = totalParts - offset; // Ist seit letztem Reset
+                const ist = (parseInt(item.Parts) || 0) - (state.agieOffsets[id] || 0);
                 const cycles = state.extraCycles[id] || 0;
                 const target = 16000 + (cycles * 16000);
                 const rest = target - ist;
@@ -114,16 +91,22 @@
                 return { id, rest, color, ist, cycles, pkg: packages[Math.min(cycles, packages.length - 1)] };
             }).sort((a,b) => a.rest - b.rest);
 
-            const list = document.getElementById('machineList');
-            const isLogged = !!auth.currentUser;
-            list.innerHTML = data.map(d => `
+            document.getElementById('machineList').innerHTML = data.map(d => `
                 <div class="control-row" style="border-left-color:${d.color}">
-                    <div style="flex:1.5"><b>A${d.id}</b><br><small>${d.pkg}</small></div>
-                    <div style="flex:1; text-align:right; font-weight:bold;">${d.rest.toLocaleString()}</div>
-                    <button class="nav-btn" ${isLogged ? '' : 'disabled'} onclick="changeCycle('${d.id}', 1)">+</button>
+                    <div style="flex:2"><b>A${d.id}</b><br><small style="color:#666">${d.pkg}</small></div>
+                    <div style="flex:1; text-align:right; font-weight:bold; color:${d.rest <= 0 ? '#8b0000' : 'black'}">
+                        ${d.rest.toLocaleString()}
+                    </div>
+                    <button class="nav-btn" onclick="changeCycle('${d.id}', 1)">+</button>
                 </div>`).join('');
             
             renderChart(data);
+        }
+
+        async function changeCycle(id, val) {
+            const current = state.extraCycles[id] || 0;
+            const newVal = Math.min(12, current + val);
+            await db.ref(`maintenanceState/extraCycles/${id}`).set(newVal);
         }
 
         function renderChart(data) {
@@ -141,53 +124,31 @@
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    scales: { 
-                        y: { beginAtZero: false, title: { display: true, text: 'Hübe bis Wartung' } }
-                    },
+                    scales: { y: { beginAtZero: false, title: { display: true, text: 'Hübe bis Wartung' } } },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
-                            enabled: true,
-                            backgroundColor: 'white',
-                            titleColor: '#d50000',
-                            bodyColor: '#333',
-                            borderColor: '#ccc',
-                            borderWidth: 1,
+                            enabled: true, backgroundColor: 'white', titleColor: '#d50000', bodyColor: '#333', borderColor: '#ccc', borderWidth: 1, padding: 12,
                             callbacks: {
                                 label: (ctx) => {
                                     const d = data[ctx.dataIndex];
                                     return [
                                         `Rest: ${d.rest.toLocaleString()} Hübe`,
                                         `Ist-Zustand: ${d.ist.toLocaleString()} Hübe`,
-                                        `Aktuelles Paket: ${d.pkg}`,
-                                        `Zyklen-Index: ${d.cycles}`
+                                        `Wartungs-Paket: ${d.pkg}`,
+                                        `Zyklus: ${d.cycles}`
                                     ];
                                 }
                             }
                         },
                         datalabels: {
-                            anchor: 'end',
-                            align: 'top',
-                            rotation: -90, // 90° Drehung der Beschriftung
-                            offset: 10,
+                            anchor: 'end', align: 'top', rotation: -90, offset: 10,
                             formatter: (v) => v.toLocaleString(),
                             font: { weight: 'bold', size: 11 }
                         }
                     }
                 }
             });
-        }
-
-        async function changeCycle(id, val) {
-            const current = state.extraCycles[id] || 0;
-            await db.ref(`maintenanceState/extraCycles/${id}`).set(Math.max(0, current + val));
-        }
-
-        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-        async function performLogin() {
-            const email = document.getElementById('loginEmail').value, pass = document.getElementById('loginPass').value;
-            try { await auth.signInWithEmailAndPassword(email, pass); closeModal('authModal'); } catch(e) { alert(e.message); }
         }
     </script>
 </body>
