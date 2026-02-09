@@ -2,140 +2,309 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Wartungs-Dashboard</title>
+    <title>Zentrales Wartungs Dashboard W430</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        :root { --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-gray: #eff1f2; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
-        .card { background: white; padding: 15px; border-radius: 4px; border-top: 5px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .card.urgent { border-top-color: var(--bosch-red); background: #fff5f5; }
-        .card.working { border-top-color: #ffa500; }
-        .btn-export { background: var(--bosch-blue); color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 2px; font-weight: bold; }
-        .nav-links a { color: var(--bosch-blue); text-decoration: none; margin-right: 15px; font-weight: bold; font-size: 14px; }
-        .login-area { background: white; padding: 20px; border-radius: 4px; max-width: 300px; margin: 100px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center; }
-        input, select, button { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
+        :root { 
+            --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-light-blue: #00b5e2; 
+            --bosch-green: #008a4f; --bosch-gray: #eff1f2; --bosch-dark-red: #8b0000;
+            --bosch-work-yellow: #fff3cd; /* Gelber Hintergrund für "In Arbeit" */
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+        
+        .top-bar { 
+            height: 45px; width: 100%; 
+            background: linear-gradient(90deg, #d50000 0%, #003a6c 50%, #008a4f 100%); 
+            display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; box-sizing: border-box; 
+        }
+
+        .header { background: white; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding: 20px; flex: 1; overflow: hidden; }
+        .column { background: white; border-top: 5px solid var(--bosch-blue); display: flex; flex-direction: column; overflow: hidden; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .col-header { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-weight: bold; font-size: 1.2em; display: flex; justify-content: space-between; align-items: center; }
+        .col-header a { text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px; font-size: 0.9em; cursor: pointer; }
+        .machine-list { flex: 1; overflow-y: auto; padding: 10px; }
+        
+        .card { padding: 12px; border-bottom: 1px solid #eee; border-left: 8px solid #ccc; margin-bottom: 8px; background: #fff; transition: background 0.3s; position: relative; }
+        .card.warning { border-left-color: #ffa500; }
+        .card.critical { border-left-color: var(--bosch-red); }
+        .card.overdue { border-left-color: var(--bosch-dark-red); }
+
+        /* NEU: "In Arbeit" Style - stoppt das Blinken und färbt den Hintergrund */
+        .card.in-progress { 
+            background: var(--bosch-work-yellow) !important; 
+            animation: none !important; 
+            border-left-style: dashed; /* Optional: macht den Balken gestrichelt für "Status geändert" */
+        }
+
+        @keyframes blink-red { 0% { background: #fff; } 50% { background: #ffcccc; } 100% { background: #fff; } }
+        .blink { animation: blink-red 1s infinite; }
+        
+        .card-info { display: flex; justify-content: space-between; align-items: flex-start; }
+        .m-id { font-weight: bold; font-size: 1.1em; }
+        .m-rest { font-weight: bold; font-size: 1.1em; }
+        .m-paket { font-size: 0.85em; color: var(--bosch-red); font-weight: 600; margin-top: 2px; }
+        select { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 2px; margin-top: 8px; }
+        /* Markierung für den ausgewählten Einsteller im Dropdown */
+        select.active-user { border: 2px solid var(--bosch-blue); background: #f0f7ff; }
+
+        .nav-btn { padding: 8px 15px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; color: var(--bosch-blue); border-radius: 2px; font-size: 13px; }
+        .btn-primary { background: var(--bosch-blue); color: white; border: none; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 4000; }
+        .modal-box { background: white; padding: 30px; border-top: 8px solid var(--bosch-red); width: 450px; text-align: left; border-radius: 4px; }
+        input, textarea { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; box-sizing: border-box; font-family: inherit; }
+        #timeout-bar-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background: #ddd; }
+        #timeout-bar { height: 100%; width: 0%; background: var(--bosch-red); transition: width 1s linear; }
     </style>
 </head>
-<body>
+<body onmousedown="resetInactivityTimer()" onkeydown="resetInactivityTimer()">
 
-    <div id="loginArea" class="login-area">
-        <h2 style="color:var(--bosch-red);">BOSCH Maintenance</h2>
-        <input type="email" id="email" placeholder="E-Mail">
-        <input type="password" id="password" placeholder="Passwort">
-        <button onclick="login()" style="background:var(--bosch-red); color:white; border:none; cursor:pointer;">Anmelden</button>
+<div class="top-bar">Zentrales Wartungs Dashboard W430</div>
+<div class="header">
+    <div>
+        <span style="color:var(--bosch-red);font-weight:900;font-size:24px;">BOSCH</span> 
+        <span style="font-weight:bold;color:#555;margin-left:10px;">Maschinenstatus</span>
     </div>
+    <div style="display:flex; gap:10px;">
+        <button class="nav-btn" onclick="openHelpModal()">ℹ️ Hilfe</button>
+        <button class="nav-btn" onclick="exportAuditLog()">📊 CSV Export</button>
+        <button id="authBtn" class="nav-btn" onclick="openLoginModal()">🔑 Login</button>
+        <button class="nav-btn" onclick="openAdminModal()">⚙️ Einsteller</button>
+    </div>
+</div>
 
-    <div id="mainContent" style="display:none;">
-        <div class="header">
-            <div>
-                <h1 style="margin:0; font-size:22px;">Wartungs-Dashboard</h1>
-                <div class="nav-links">
-                    <a href="agie.html" target="_blank">⚙️ Agie</a>
-                    <a href="he.html" target="_blank">⚙️ HE</a>
-                    <a href="unotron.html" target="_blank">⚙️ Unotron</a>
-                </div>
-            </div>
-            <button class="btn-export" onclick="exportCSV()">📊 CSV Export (Audit-Log)</button>
+<div class="dashboard-grid">
+    <div class="column">
+        <div class="col-header"><a onclick="openManagedWindow('agie.html')">⚡ Agie ➔</a> <span id="count-agie">0</span></div>
+        <div class="machine-list" id="list-agie"></div>
+    </div>
+    <div class="column" style="border-top-color: var(--bosch-green);">
+        <div class="col-header"><a onclick="openManagedWindow('unotron.html')">🧪 Unotron ➔</a> <span id="count-uno">0</span></div>
+        <div class="machine-list" id="list-uno"></div>
+    </div>
+    <div class="column" style="border-top-color: var(--bosch-light-blue);">
+        <div class="col-header"><a onclick="openManagedWindow('he.html')">⚙️ HE ➔</a> <span id="count-he">0</span></div>
+        <div class="machine-list" id="list-he"></div>
+    </div>
+</div>
+
+<div id="timeout-bar-container"><div id="timeout-bar"></div></div>
+
+<div id="loginModal" class="modal">
+    <div class="modal-box" style="text-align: center;">
+        <h3>Login</h3>
+        <input type="email" id="mEmail" placeholder="E-Mail">
+        <input type="password" id="mPass" placeholder="Passwort">
+        <div id="regExtra" style="display:none;">
+            <input type="text" id="mInvite" placeholder="Einladungscode">
+            <p style="font-size:11px;color:#666;">Den Einladungscode erhalten Sie von Ihrem TL, FK oder Admin.</p>
         </div>
-        <div class="card-grid" id="dashboardGrid">Suche fällige Wartungen...</div>
+        <button class="nav-btn btn-primary" style="width:100%;margin-top:10px;" onclick="handleAuthAction()">Bestätigen</button>
+        <p id="toggleT" style="cursor:pointer;color:var(--bosch-blue);font-size:12px;" onclick="toggleM()">Konto erstellen?</p>
+        <button class="nav-btn" style="width:100%" onclick="closeModals()">Abbrechen</button>
     </div>
+</div>
 
-    <script>
-        const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung" };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-        const auth = firebase.auth();
-        const EINSTELLER = ["-- Einsteller wählen --", "Müller", "Schmidt", "Fischer", "Weber", "Meyer"];
+<div id="adminModal" class="modal">
+    <div class="modal-box">
+        <h3>Einsteller-Liste bearbeiten</h3>
+        <p style="font-size: 12px; color: #666;">Namen durch Komma trennen (z.B. Müller, Schmidt, Meyer):</p>
+        <textarea id="einstellerTextarea" rows="6"></textarea>
+        <button class="nav-btn btn-primary" style="width:100%; margin-top:10px;" onclick="saveEinstellerList()">Liste speichern</button>
+        <button class="nav-btn" style="width:100%; margin-top:5px;" onclick="closeModals()">Abbrechen</button>
+    </div>
+</div>
 
-        function login() {
-            auth.signInWithEmailAndPassword(document.getElementById('email').value, document.getElementById('password').value)
-                .catch(err => alert("Login-Fehler: " + err.message));
+<div id="helpModal" class="modal">
+    <div class="modal-box">
+        <h2 style="color:var(--bosch-blue); border-bottom: 2px solid var(--bosch-red); padding-bottom: 10px;">System-Anleitung</h2>
+        <div style="font-size: 0.9em; line-height: 1.4;">
+            <p><strong>1. Überwachung:</strong> Karten zeigen fällige Wartungen proportional zum Intervall.</p>
+            <p><strong>2. In Arbeit:</strong> Sobald ein Einsteller gewählt ist, stoppt das Blinken und die Karte wird gelb.</p>
+            <p><strong>3. Auto-Logout:</strong> Nach 70s Inaktivität wird der User ausgeloggt.</p>
+            <hr>
+            <strong>Systemverantwortlicher: Norman Schultheis</strong>
+        </div>
+        <button class="nav-btn btn-primary" style="width:100%; margin-top:20px;" onclick="closeModals()">Schließen</button>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database(), auth = firebase.auth();
+
+    const AGIE_PKGS = ["P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/5", "P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/6/7", "P1/2"];
+    const UNO_STEPS = [{total:2000, pkg:"P1, P2"}, {total:4000, pkg:"P3"}, {total:10000, pkg:"P1"}, {total:14000, pkg:"P5"}, {total:18000, pkg:"P1, P2"}, {total:26000, pkg:"P1"}, {total:28000, pkg:"P6, P7"}, {total:30000, pkg:"P3"}, {total:34000, pkg:"P1, P2"}, {total:42000, pkg:"P1"}, {total:50000, pkg:"P1, P2"}, {total:56000, pkg:"P3"}, {total:58000, pkg:"P1"}, {total:66000, pkg:"P1, P2"}, {total:74000, pkg:"P1"}, {total:82000, pkg:"P1, P2"}, {total:90000, pkg:"P3"}, {total:98000, pkg:"P1"}, {total:104000, pkg:"WP RESET"}];
+
+    let state = { config:{}, assignments:{}, agie:{}, uno:{}, he:{} };
+    let isReg = false;
+    let managedWindows = [];
+    let inactivityTimer;
+    let startTime;
+
+    window.resetInactivityTimer = function() {
+        clearTimeout(inactivityTimer);
+        if (auth.currentUser) {
+            startTime = Date.now();
+            inactivityTimer = setTimeout(forceLogout, 70000);
+            updateBar();
         }
+    }
 
-        auth.onAuthStateChanged(user => {
-            if(user) {
-                document.getElementById('loginArea').style.display = 'none';
-                document.getElementById('mainContent').style.display = 'block';
-                db.ref().on('value', snap => {
-                    const data = snap.val();
-                    if (data) renderDashboard(data);
-                });
+    function updateBar() {
+        if (!auth.currentUser) return;
+        const elapsed = Date.now() - startTime;
+        const pct = Math.min(100, (elapsed / 70000) * 100);
+        document.getElementById('timeout-bar').style.width = pct + "%";
+        if (pct < 100) requestAnimationFrame(updateBar);
+    }
+
+    async function forceLogout() {
+        managedWindows.forEach(win => { if(!win.closed) win.close(); });
+        managedWindows = [];
+        if(auth.currentUser) {
+            await auth.signOut();
+            alert("Sitzung beendet (70s Inaktivität).");
+        }
+    }
+
+    function openManagedWindow(url) {
+        const win = window.open(url, '_blank');
+        if(win) managedWindows.push(win);
+    }
+
+    db.ref('config').on('value', s => { state.config = s.val() || {}; updateUI(); });
+    db.ref('dashboardAssignments').on('value', s => { state.assignments = s.val() || {}; updateUI(); });
+    db.ref('maintenanceState').on('value', s => { state.agie = s.val() || {}; updateUI(); });
+    db.ref('maintenanceStateUnotron').on('value', s => { state.uno = s.val() || {}; updateUI(); });
+    db.ref('maintenanceStateHE').on('value', s => { state.he = s.val() || {}; updateUI(); });
+
+    auth.onAuthStateChanged(user => {
+        document.getElementById('authBtn').innerText = user ? "🔓 Logout" : "🔑 Login";
+        if(user) resetInactivityTimer();
+        else { clearTimeout(inactivityTimer); document.getElementById('timeout-bar').style.width = "0%"; }
+        updateUI();
+    });
+
+    async function writeLog(action, machine, detail) {
+        const user = auth.currentUser ? auth.currentUser.email : "Unbekannt";
+        await db.ref('auditLog').push({ timestamp: new Date().toISOString(), user, action, machine, detail });
+    }
+
+    async function handleAuthAction() {
+        const email = document.getElementById('mEmail').value, pass = document.getElementById('mPass').value;
+        try {
+            if(isReg) {
+                if(document.getElementById('mInvite').value !== "bosch2026") return alert("Code falsch!");
+                await auth.createUserWithEmailAndPassword(email, pass);
+            } else { await auth.signInWithEmailAndPassword(email, pass); }
+            closeModals();
+        } catch(e) { alert(e.message); }
+    }
+
+    async function safeSave(key, val) {
+        if(!auth.currentUser) return alert("Bitte erst einloggen!");
+        if(prompt("Admin Passwort zur Bestätigung:") !== state.config.AdminPW) {
+            alert("Code falsch!"); updateUI(); return;
+        }
+        await db.ref(`dashboardAssignments/${key}`).set(val);
+        writeLog("Einsteller Zuweisung", key, `Neuer Einsteller: ${val}`);
+        resetInactivityTimer();
+    }
+
+    async function exportAuditLog() {
+        if(prompt("Admin Passwort für Export:") !== state.config.AdminPW) return alert("Keine Berechtigung!");
+        const snapshot = await db.ref('auditLog').once('value');
+        const logs = snapshot.val();
+        if(!logs) return alert("Keine Daten.");
+        let csv = "\ufeffZeitstempel;Benutzer;Aktion;Maschine;Details\n";
+        Object.values(logs).forEach(l => { csv += `${l.timestamp};${l.user};${l.action};${l.machine};${l.detail}\n`; });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        link.setAttribute("download", `AuditLog.csv`);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+
+    function updateUI() {
+        renderCol('list-agie', 'count-agie', state.agie, 'A', 16000);
+        renderCol('list-uno', 'count-uno', state.uno, 'U', 2000);
+        renderCol('list-he', 'count-he', state.he, 'H', 156000);
+    }
+
+    function renderCol(id, cId, raw, pre, interval) {
+        if(!raw.cloudRawData) return;
+        const warnLimit = interval * 0.125; 
+        const critLimit = interval * 0.03125; 
+
+        const data = raw.cloudRawData.map(item => {
+            const sId = item.StationNo || item.STATIONNO;
+            const cIdx = raw.extraCycles?.[sId] || 0;
+            let ist, target, pkg;
+            if(pre==='A') { 
+                ist = (parseInt(item.Parts)||0) - (raw.agieOffsets?.[sId]||0); 
+                target = 16000 + (cIdx * 16000);
+                pkg = AGIE_PKGS[Math.min(cIdx, AGIE_PKGS.length-1)];
+            } else if(pre==='U') {
+                ist = parseInt(item["COUNT(*)"]||0);
+                const tObj = UNO_STEPS[cIdx] || { total: 104000+((cIdx-18)*5000), pkg: "Folge" };
+                target = tObj.total; pkg = tObj.pkg;
+            } else {
+                ist = (parseInt(item.Parts)||0) - (raw.heOffsets?.[sId]||0);
+                target = 156000 + (cIdx * 156000);
+                pkg = "Wartung";
             }
-        });
+            return { id:pre+sId, rest: target-ist, key:pre+sId, pkg };
+        }).filter(m => m.rest < warnLimit).sort((a,b) => a.rest - b.rest);
 
-        function renderDashboard(data) {
-            const grid = document.getElementById('dashboardGrid');
-            grid.innerHTML = "";
-            const assignments = data.dashboardAssignments || {};
+        document.getElementById(cId).innerText = data.length;
+        document.getElementById(id).innerHTML = data.map(m => {
+            const assigned = state.assignments[m.key] || "";
+            const isWorking = assigned !== "";
+            const blinkClass = (m.rest <= 0 && !isWorking) ? 'blink overdue' : (m.rest <= 0 ? 'overdue' : (m.rest < critLimit ? 'critical' : 'warning'));
+            const workingClass = isWorking ? 'in-progress' : '';
 
-            // AGIE
-            const agieData = data.maintenanceState?.cloudRawData || [];
-            agieData.forEach(m => {
-                const id = m.StationNo;
-                const off = data.maintenanceState.agieOffsets?.[id] || 0;
-                const cyc = data.maintenanceState.extraCycles?.[id] || 0;
-                const rest = (16000 + (cyc * 16000)) - (parseInt(m.Parts) - off);
-                if(rest <= 2000) createCard(grid, `A-${id}`, rest, assignments[`A${id}`], `A${id}`);
-            });
-
-            // HE
-            const heData = data.maintenanceStateHE?.cloudRawData || [];
-            heData.forEach(m => {
-                const id = m.STATIONNO;
-                const off = data.maintenanceStateHE.heOffsets?.[id] || 0;
-                const cyc = data.maintenanceStateHE.extraCycles?.[id] || 0;
-                const rest = (156000 + (cyc * 156000)) - (parseInt(m.Parts) - off);
-                if(rest <= 19500) createCard(grid, `H-${id}`, rest, assignments[`H${id}`], `H${id}`);
-            });
-
-            // UNOTRON
-            const unoData = data.maintenanceStateUnotron?.cloudRawData || [];
-            const UNO_STEPS = [2000, 4000, 10000, 14000, 18000, 26000, 28000, 30000, 34000, 42000, 50000, 56000, 58000, 66000, 74000, 82000, 90000, 98000, 104000];
-            unoData.forEach(m => {
-                const id = m.STATIONNO || m.StationNo;
-                const ist = parseInt(m["COUNT(*)"] || 0);
-                const cyc = data.maintenanceStateUnotron.extraCycles?.[id] || 0;
-                const target = UNO_STEPS[cyc] || (104000 + ((cyc - 18) * 5000));
-                const rest = target - ist;
-                if(rest <= 250) createCard(grid, `U-${id}`, rest, assignments[`U${id}`], `U${id}`);
-            });
-
-            if(grid.innerHTML === "") grid.innerHTML = "<p>Aktuell keine Wartungen fällig.</p>";
-        }
-
-        function createCard(container, label, rest, currentAssign, dbKey) {
-            const isUrgent = rest <= (label.startsWith('H') ? 4800 : (label.startsWith('U') ? 60 : 500));
-            const isWorking = currentAssign && currentAssign !== EINSTELLER[0];
-            const div = document.createElement('div');
-            div.className = `card ${isUrgent ? 'urgent' : ''} ${isWorking ? 'working' : ''}`;
-            div.innerHTML = `
-                <h3 style="margin:0">${label}</h3>
-                <p>Rest: <b>${rest.toLocaleString()}</b></p>
-                <select onchange="db.ref('dashboardAssignments/${dbKey}').set(this.value)">
-                    ${EINSTELLER.map(e => `<option value="${e}" ${e === currentAssign ? 'selected' : ''}>${e}</option>`).join('')}
+            return `
+            <div class="card ${blinkClass} ${workingClass}">
+                <div class="card-info">
+                    <div><div class="m-id">${m.id}</div><div class="m-paket">${m.pkg}</div></div>
+                    <div class="m-rest">${m.rest.toLocaleString()}</div>
+                </div>
+                <select class="${isWorking ? 'active-user' : ''}" ${!auth.currentUser?'disabled':''} onchange="safeSave('${m.key}', this.value)">
+                    <option value="">-- Einsteller wählen --</option>
+                    ${(state.config.einstellerListe||[]).map(e => `<option value="${e}" ${assigned===e?'selected':''}>${e}</option>`).join('')}
                 </select>
-            `;
-            container.appendChild(div);
-        }
+            </div>`;
+        }).join('');
+    }
 
-        async function exportCSV() {
-            const snap = await db.ref('auditLog').once('value');
-            const logs = snap.val();
-            if(!logs) return alert("Keine Daten.");
-            let csv = "\uFEFFDatum;Uhrzeit;Benutzer;Aktion;Maschine;Details;Reststückzahl;Gesamtstückzahl;Paket;Status\n";
-            Object.values(logs).forEach(l => {
-                csv += `${l.Datum||''};${l.Uhrzeit||''};${l.Benutzer||''};${l.Aktion||''};${l.Maschine||''};${l.Details||''};${l.Reststückzahl||''};${l.Gesamtstückzahl||''};${l.Paket||''};${l.Status||''}\n`;
-            });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = "AuditLog.csv";
-            link.click();
+    function openHelpModal() { document.getElementById('helpModal').style.display='flex'; }
+    function openLoginModal() { if(auth.currentUser) auth.signOut(); else document.getElementById('loginModal').style.display='flex'; }
+    function closeModals() { 
+        document.getElementById('loginModal').style.display='none'; 
+        document.getElementById('helpModal').style.display='none'; 
+        document.getElementById('adminModal').style.display='none'; 
+    }
+    function toggleM() { isReg=!isReg; document.getElementById('regExtra').style.display=isReg?'block':'none'; }
+    
+    function openAdminModal() {
+        if(prompt("Admin PW:") === state.config.AdminPW) {
+            document.getElementById('adminModal').style.display = 'flex';
+            document.getElementById('einstellerTextarea').value = (state.config.einstellerListe || []).join(', ');
+        } else {
+            alert("Code falsch!");
         }
-    </script>
+    }
+
+    async function saveEinstellerList() {
+        const text = document.getElementById('einstellerTextarea').value;
+        const newList = text.split(',').map(s => s.trim()).filter(s => s !== "");
+        await db.ref('config/einstellerListe').set(newList);
+        writeLog("Einsteller Liste geändert", "System", `Neue Liste gespeichert`);
+        closeModals();
+    }
+</script>
 </body>
 </html>
