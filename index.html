@@ -7,40 +7,51 @@
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        :root { --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-gray: #eff1f2; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
-        .top-bar { height: 45px; background: linear-gradient(90deg, #d50000 0%, #003a6c 50%, #008a4f 100%); color: white; display: flex; align-items: center; padding: 0 20px; font-weight: bold; }
-        .dashboard { display: flex; flex: 1; padding: 20px; gap: 20px; }
-        .column { flex: 1; background: white; border-top: 5px solid var(--bosch-blue); display: flex; flex-direction: column; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .col-header { padding: 15px; border-bottom: 2px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        :root { 
+            --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-light-blue: #00b5e2; 
+            --bosch-green: #008a4f; --bosch-gray: #eff1f2;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .top-bar { height: 45px; width: 100%; background: linear-gradient(90deg, #d50000 0%, #d50000 25%, #003a6c 25%, #003a6c 50%, #00b5e2 50%, #00b5e2 75%, #008a4f 75%, #008a4f 100%); display: flex; align-items: center; padding: 0 15px; box-sizing: border-box; }
+        .bar-title { color: white; font-size: 19px; font-weight: 600; }
+        .dashboard-container { display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden; }
+        .column { flex: 1; background: white; border-top: 4px solid var(--bosch-blue); display: flex; flex-direction: column; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 2px; }
+        .col-header { padding: 15px; border-bottom: 2px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fafafa; }
         .col-header a { font-size: 20px; font-weight: bold; color: var(--bosch-blue); text-decoration: none; cursor: pointer; }
-        .col-header a:hover { color: var(--bosch-red); }
+        .col-header a:hover { color: var(--bosch-red); text-decoration: underline; }
         .status-list { flex: 1; overflow-y: auto; padding: 10px; }
-        .status-item { padding: 8px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; font-size: 14px; }
-        .critical { color: var(--bosch-red); font-weight: bold; }
+        .status-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        .status-item:last-child { border-bottom: none; }
+        .crit-count { background: var(--bosch-red); color: white; padding: 2px 8px; border-radius: 10px; font-size: 14px; font-weight: bold; }
+        .val { font-family: 'Courier New', monospace; font-weight: bold; }
+        .critical { color: var(--bosch-red); background: #fff5f5; }
     </style>
 </head>
-<body>
-    <div class="top-bar">BOSCH W430 - ZENTRALES WARTUNGSDASHBOARD</div>
-    <div class="dashboard">
-        <div class="column">
+<body onmousedown="resetInactivityTimer()" onkeydown="resetInactivityTimer()">
+
+    <div class="top-bar"><div class="bar-title">BOSCH W430 - Zentrales Wartungsmanagement</div></div>
+
+    <div class="dashboard-container">
+        <div class="column" style="border-top-color: var(--bosch-blue);">
             <div class="col-header">
                 <a onclick="openManagedWindow('agie.html')">⚡ AGIE ➔</a>
-                <span id="count-agie" style="font-weight:bold;">0</span>
+                <span id="count-agie" class="crit-count">0</span>
             </div>
             <div class="status-list" id="list-agie"></div>
         </div>
-        <div class="column">
+
+        <div class="column" style="border-top-color: var(--bosch-green);">
             <div class="col-header">
                 <a onclick="openManagedWindow('unotron.html')">🧪 UNOTRON ➔</a>
-                <span id="count-unotron" style="font-weight:bold;">0</span>
+                <span id="count-unotron" class="crit-count">0</span>
             </div>
             <div class="status-list" id="list-unotron"></div>
         </div>
-        <div class="column">
+
+        <div class="column" style="border-top-color: var(--bosch-light-blue);">
             <div class="col-header">
                 <a onclick="openManagedWindow('he.html')">⚙️ HE ➔</a>
-                <span id="count-he" style="font-weight:bold;">0</span>
+                <span id="count-he" class="crit-count">0</span>
             </div>
             <div class="status-list" id="list-he"></div>
         </div>
@@ -54,61 +65,74 @@
             projectId: "bosch-agie-wartung"
         };
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        const db = firebase.database(), auth = firebase.auth();
+
         let managedWindows = [];
+        let logoutTimer;
+        const timeoutSeconds = 900; // 15 Minuten Inaktivität im Dashboard
 
         function openManagedWindow(url) {
-            const win = window.open(url, '_blank', 'width=1200,height=850');
+            const win = window.open(url, '_blank', 'width=1300,height=900');
             if (win) managedWindows.push(win);
         }
 
-        // Überwachung der Agie-Daten
+        function resetInactivityTimer() {
+            clearTimeout(logoutTimer);
+            logoutTimer = setTimeout(() => {
+                managedWindows.forEach(w => { if(!w.closed) w.close(); });
+                auth.signOut();
+            }, timeoutSeconds * 1000);
+        }
+
+        // AGIE Sync
         db.ref('maintenanceState').on('value', snap => {
             const val = snap.val() || {};
             const raw = val.cloudRawData || [];
             const offsets = val.agieOffsets || {};
             const cycles = val.extraCycles || {};
-            let critCount = 0;
+            let crit = 0;
             const html = raw.map(item => {
                 const rest = (16000 + (cycles[item.StationNo]||0)*16000) - ((item.Parts||0)-(offsets[item.StationNo]||0));
-                if(rest < 500) critCount++;
-                return `<div class="status-item ${rest < 500 ? 'critical' : ''}"><span>A${item.StationNo}</span><span>${rest.toLocaleString()}</span></div>`;
+                if(rest < 1000) crit++;
+                return `<div class="status-item ${rest < 500 ? 'critical' : ''}"><span>A${item.StationNo}</span><span class="val">${rest.toLocaleString()}</span></div>`;
             }).join('');
             document.getElementById('list-agie').innerHTML = html;
-            document.getElementById('count-agie').innerText = critCount;
+            document.getElementById('count-agie').innerText = crit;
         });
 
-        // Überwachung der Unotron-Daten
+        // UNOTRON Sync
         db.ref('maintenanceStateUnotron').on('value', snap => {
             const val = snap.val() || {};
             const raw = val.cloudRawData || [];
             const cycles = val.extraCycles || {};
-            let critCount = 0;
+            let crit = 0;
             const html = raw.map(item => {
                 const cIdx = cycles[item.STATIONNO] || 0;
-                const rest = (2000 + cIdx*2000) - (item["COUNT(*)"] || 0); // Vereinfachte Logik für Dashboard-Vorschau
-                if(rest < 500) critCount++;
-                return `<div class="status-item ${rest < 500 ? 'critical' : ''}"><span>UNO-${item.STATIONNO}</span><span>${rest.toLocaleString()}</span></div>`;
+                const rest = (2000 + cIdx*2000) - (item["COUNT(*)"] || 0);
+                if(rest < 1000) crit++;
+                return `<div class="status-item ${rest < 500 ? 'critical' : ''}"><span>UNO-${item.STATIONNO}</span><span class="val">${rest.toLocaleString()}</span></div>`;
             }).join('');
             document.getElementById('list-unotron').innerHTML = html;
-            document.getElementById('count-unotron').innerText = critCount;
+            document.getElementById('count-unotron').innerText = crit;
         });
 
-        // Überwachung der HE-Daten
+        // HE Sync
         db.ref('maintenanceStateHE').on('value', snap => {
             const val = snap.val() || {};
             const raw = val.cloudRawData || [];
             const offsets = val.heOffsets || {};
             const cycles = val.extraCycles || {};
-            let critCount = 0;
+            let crit = 0;
             const html = raw.map(item => {
                 const rest = (16000 + (cycles[item.StationNo]||0)*16000) - ((item.Parts||0)-(offsets[item.StationNo]||0));
-                if(rest < 500) critCount++;
-                return `<div class="status-item ${rest < 500 ? 'critical' : ''}"><span>HE-${item.StationNo}</span><span>${rest.toLocaleString()}</span></div>`;
+                if(rest < 1000) crit++;
+                return `<div class="status-item ${rest < 500 ? 'critical' : ''}"><span>HE-${item.StationNo}</span><span class="val">${rest.toLocaleString()}</span></div>`;
             }).join('');
             document.getElementById('list-he').innerHTML = html;
-            document.getElementById('count-he').innerText = critCount;
+            document.getElementById('count-he').innerText = crit;
         });
+
+        resetInactivityTimer();
     </script>
 </body>
 </html>
