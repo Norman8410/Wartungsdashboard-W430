@@ -52,6 +52,24 @@
             document.querySelectorAll('.btn-wp, .btn-cycle').forEach(btn => btn.disabled = !user);
         });
 
+        // Zentrales Logging für CSV Export
+        async function writeLog(action, machine, detail, rest, gesamt, paket) {
+            if(!currentUser) return;
+            const now = new Date();
+            await db.ref('auditLog').push({
+                Datum: now.toLocaleDateString('de-DE'),
+                Uhrzeit: now.toLocaleTimeString('de-DE'),
+                Benutzer: currentUser.email,
+                Aktion: action,
+                Maschine: machine,
+                Details: detail,
+                Reststückzahl: rest,
+                Gesamtstückzahl: gesamt,
+                Paket: paket,
+                Status: action.includes("STORNO") ? "Storniert" : (rest <= 0 ? "Erledigt" : "Erledigt vorgezogen")
+            });
+        }
+
         db.ref('maintenanceState').on('value', snap => {
             const val = snap.val() || {}, raw = val.cloudRawData || [], offsets = val.agieOffsets || {}, cycles = val.extraCycles || {};
             const data = raw.map(item => {
@@ -80,24 +98,42 @@
             const refCyc = db.ref(`maintenanceState/extraCycles/${id}`);
             const refAssign = db.ref(`dashboardAssignments/A${id}`);
             const refBackup = db.ref(`maintenanceState/lastEinsteller/A${id}`);
-            const snap = await refCyc.once('value');
-            const newVal = Math.max(0, (snap.val() || 0) + v);
+            
+            const stateSnap = await db.ref('maintenanceState').once('value');
+            const stateVal = stateSnap.val();
+            const mData = stateVal.cloudRawData.find(m => m.StationNo == id);
+            const tot = parseInt(mData.Parts), off = stateVal.agieOffsets?.[id] || 0, cyc = stateVal.extraCycles?.[id] || 0;
+            const rest = (16000 + (cyc * 16000)) - (tot - off);
+            
+            const newVal = Math.max(0, cyc + v);
+            
             if (v > 0) {
                 const snapAssign = await refAssign.once('value');
                 if(snapAssign.val()) await refBackup.set(snapAssign.val());
                 await refAssign.set("");
+                await writeLog("Paket-Erhöhung (+)", `A-${id}`, `Wechsel zu P${newVal}`, rest, tot, AGIE_PKGS[Math.min(cyc, AGIE_PKGS.length-1)]);
             } else if (v < 0) {
                 const snapBackup = await refBackup.once('value');
                 if(snapBackup.val()) await refAssign.set(snapBackup.val());
+                await writeLog("STORNO (-)", `A-${id}`, `Zurück auf P${newVal}`, rest, tot, AGIE_PKGS[Math.min(cyc, AGIE_PKGS.length-1)]);
             }
             await refCyc.set(newVal);
         }
 
         async function resetWP(id, totalParts) {
-            if(!currentUser || !confirm(`Reset für A-${id}?`)) return;
+            if(!currentUser || !confirm(`Komplettes WP Reset für A-${id}?`)) return;
+
+            const stateSnap = await db.ref('maintenanceState').once('value');
+            const stateVal = stateSnap.val();
+            const mData = stateVal.cloudRawData.find(m => m.StationNo == id);
+            const tot = parseInt(mData.Parts), off = stateVal.agieOffsets?.[id] || 0, cyc = stateVal.extraCycles?.[id] || 0;
+            const rest = (16000 + (cyc * 16000)) - (tot - off);
+
             await db.ref(`maintenanceState/agieOffsets/${id}`).set(totalParts);
             await db.ref(`maintenanceState/extraCycles/${id}`).set(0);
             await db.ref(`dashboardAssignments/A${id}`).set("");
+
+            await writeLog("WP-Reset", `A-${id}`, "Grundwartung abgeschlossen", rest, totalParts, "Komplett");
         }
 
         function renderChart(data) {
