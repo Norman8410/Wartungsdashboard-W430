@@ -22,22 +22,16 @@
         .btn-cycle:disabled, .btn-wp:disabled { opacity: 0.3; cursor: not-allowed; }
         @keyframes blink-red { 0% { background: #fff; } 50% { background: #ffcccc; } 100% { background: #fff; } }
         .blink { animation: blink-red 1s infinite; }
-        #auth-status { font-size: 12px; color: #666; font-weight: normal; }
+        #auth-status { font-size: 12px; color: #666; }
     </style>
 </head>
 <body>
     <div class="top-bar">Agie Wartungsübersicht</div>
     <div class="header">
-        <div>
-            <span style="font-size: 24px; color: var(--bosch-red); font-weight: 900;">BOSCH</span>
-            <span id="auth-status" style="margin-left: 15px;">Prüfe Berechtigung...</span>
-        </div>
-        <button class="btn-wp" onclick="window.close()">❌ Fenster schließen</button>
+        <div><span style="font-size: 24px; color: var(--bosch-red); font-weight: 900;">BOSCH</span><span id="auth-status" style="margin-left: 15px;">Prüfe Berechtigung...</span></div>
+        <button class="btn-wp" onclick="window.close()">❌ Schließen</button>
     </div>
-    <div class="main-layout">
-        <div class="chart-area"><canvas id="mainChart"></canvas></div>
-        <div class="sidebar" id="machineList">Lade Daten...</div>
-    </div>
+    <div class="main-layout"><div class="chart-area"><canvas id="mainChart"></canvas></div><div class="sidebar" id="machineList">Lade Daten...</div></div>
 
     <script>
         const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung" };
@@ -48,9 +42,14 @@
 
         auth.onAuthStateChanged(user => {
             currentUser = user;
-            document.getElementById('auth-status').innerText = user ? `Eingeloggt: ${user.email}` : "⚠️ Nur Lesemodus (Bitte im Dashboard einloggen)";
+            document.getElementById('auth-status').innerText = user ? `Eingeloggt: ${user.email}` : "⚠️ Nur Lesemodus";
             document.querySelectorAll('.btn-wp, .btn-cycle').forEach(btn => btn.disabled = !user);
         });
+
+        async function writeLog(action, machine, detail) {
+            const user = auth.currentUser ? auth.currentUser.email : "Unbekannt";
+            await db.ref('auditLog').push({ timestamp: new Date().toISOString(), user, action, machine, detail });
+        }
 
         db.ref('maintenanceState').on('value', snap => {
             const val = snap.val() || {}, raw = val.cloudRawData || [], offsets = val.agieOffsets || {}, cycles = val.extraCycles || {};
@@ -81,14 +80,18 @@
             const refAssign = db.ref(`dashboardAssignments/A${id}`);
             const refBackup = db.ref(`maintenanceState/lastEinsteller/A${id}`);
             const snap = await refCyc.once('value');
-            const newVal = Math.max(0, (snap.val() || 0) + v);
+            const oldVal = snap.val() || 0;
+            const newVal = Math.max(0, oldVal + v);
+
             if (v > 0) {
                 const snapAssign = await refAssign.once('value');
                 if(snapAssign.val()) await refBackup.set(snapAssign.val());
                 await refAssign.set("");
+                await writeLog("Paket-Erhöhung (+)", `A-${id}`, `Von P${oldVal} auf P${newVal}`);
             } else if (v < 0) {
                 const snapBackup = await refBackup.once('value');
                 if(snapBackup.val()) await refAssign.set(snapBackup.val());
+                await writeLog("STORNO / Korrektur (-)", `A-${id}`, `Von P${oldVal} auf P${newVal}`);
             }
             await refCyc.set(newVal);
         }
@@ -98,6 +101,7 @@
             await db.ref(`maintenanceState/agieOffsets/${id}`).set(totalParts);
             await db.ref(`maintenanceState/extraCycles/${id}`).set(0);
             await db.ref(`dashboardAssignments/A${id}`).set("");
+            await writeLog("WP-Reset (Grundwartung)", `A-${id}`, `Zählerstand: ${totalParts}`);
         }
 
         function renderChart(data) {
