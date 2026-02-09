@@ -43,36 +43,22 @@
         const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database(), auth = firebase.auth();
-        
         const AGIE_PKGS = ["P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/5", "P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/6/7", "P1/2"];
-        let chart = null;
-        let currentUser = null;
+        let chart = null, currentUser = null;
 
-        // Login Status überwachen
         auth.onAuthStateChanged(user => {
             currentUser = user;
-            document.getElementById('auth-status').innerText = user ? `Eingeloggt als: ${user.email}` : "⚠️ Nur Lesemodus (Bitte im Dashboard einloggen)";
+            document.getElementById('auth-status').innerText = user ? `Eingeloggt: ${user.email}` : "⚠️ Nur Lesemodus (Bitte im Dashboard einloggen)";
             document.querySelectorAll('.btn-wp, .btn-cycle').forEach(btn => btn.disabled = !user);
         });
 
         db.ref('maintenanceState').on('value', snap => {
-            const val = snap.val() || {};
-            const raw = val.cloudRawData || [];
-            const offsets = val.agieOffsets || {};
-            const cycles = val.extraCycles || {};
-            
+            const val = snap.val() || {}, raw = val.cloudRawData || [], offsets = val.agieOffsets || {}, cycles = val.extraCycles || {};
             const data = raw.map(item => {
-                const id = item.StationNo;
-                const totalParts = parseInt(item.Parts) || 0;
-                const offset = offsets[id] || 0;
-                const ist = totalParts - offset;
-                const cyc = cycles[id] || 0;
-                const target = 16000 + (cyc * 16000);
-                const rest = target - ist;
+                const id = item.StationNo, totalParts = parseInt(item.Parts) || 0, offset = offsets[id] || 0, ist = totalParts - offset, cyc = cycles[id] || 0, target = 16000 + (cyc * 16000), rest = target - ist;
                 return { id, rest, ist, color: getC(rest), cyc, pkg: AGIE_PKGS[Math.min(cyc, AGIE_PKGS.length-1)], totalParts };
             }).sort((a,b) => a.rest - b.rest);
-            renderList(data);
-            renderChart(data);
+            renderList(data); renderChart(data);
         });
 
         function getC(r) { return r <= 0 ? "#8b0000" : (r <= 500 ? "#d50000" : (r <= 2000 ? "#ffa500" : "#008a4f")); }
@@ -82,26 +68,36 @@
                 <div class="row ${d.rest <= 0 ? 'blink' : ''}" style="border-left-color:${d.color}">
                     <div style="flex:1"><b>A-${d.id}</b></div>
                     <div style="flex:1; text-align:right;"><b>${d.rest.toLocaleString()}</b></div>
-                    <button class="btn-wp" ${!currentUser?'disabled':''} onclick="resetWP('${d.id}', ${d.totalParts})">WP</button>
-                    <button class="btn-cycle" ${!currentUser?'disabled':''} onclick="changeC('${d.id}', -1)">-</button>
-                    <span style="min-width: 20px; text-align: center;">${d.cyc}</span>
-                    <button class="btn-cycle" ${!currentUser?'disabled':''} onclick="changeC('${d.id}', 1)">+</button>
+                    <button class="btn-wp" onclick="resetWP('${d.id}', ${d.totalParts})">WP</button>
+                    <button class="btn-cycle" onclick="changeC('${d.id}', -1)">-</button>
+                    <span style="min-width: 20px; text-align: center; font-weight: bold;">${d.cyc}</span>
+                    <button class="btn-cycle" onclick="changeC('${d.id}', 1)">+</button>
                 </div>`).join('');
         }
 
         async function changeC(id, v) {
-            if(!currentUser) return alert("Nicht berechtigt!");
-            const ref = db.ref(`maintenanceState/extraCycles/${id}`);
-            const snap = await ref.once('value');
-            await ref.set(Math.max(0, (snap.val() || 0) + v));
+            if(!currentUser) return;
+            const refCyc = db.ref(`maintenanceState/extraCycles/${id}`);
+            const refAssign = db.ref(`dashboardAssignments/A${id}`);
+            const refBackup = db.ref(`maintenanceState/lastEinsteller/A${id}`);
+            const snap = await refCyc.once('value');
+            const newVal = Math.max(0, (snap.val() || 0) + v);
+            if (v > 0) {
+                const snapAssign = await refAssign.once('value');
+                if(snapAssign.val()) await refBackup.set(snapAssign.val());
+                await refAssign.set("");
+            } else if (v < 0) {
+                const snapBackup = await refBackup.once('value');
+                if(snapBackup.val()) await refAssign.set(snapBackup.val());
+            }
+            await refCyc.set(newVal);
         }
 
         async function resetWP(id, totalParts) {
-            if(!currentUser) return alert("Nicht berechtigt!");
-            if(confirm(`Reset für A-${id}?`)) {
-                await db.ref(`maintenanceState/agieOffsets/${id}`).set(totalParts);
-                await db.ref(`maintenanceState/extraCycles/${id}`).set(0);
-            }
+            if(!currentUser || !confirm(`Reset für A-${id}?`)) return;
+            await db.ref(`maintenanceState/agieOffsets/${id}`).set(totalParts);
+            await db.ref(`maintenanceState/extraCycles/${id}`).set(0);
+            await db.ref(`dashboardAssignments/A${id}`).set("");
         }
 
         function renderChart(data) {
