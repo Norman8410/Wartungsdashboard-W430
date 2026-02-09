@@ -10,67 +10,46 @@
         :root { 
             --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-light-blue: #00b5e2; 
             --bosch-green: #008a4f; --bosch-gray: #eff1f2; --bosch-dark-red: #8b0000;
-            --bosch-work-yellow: #fff3cd; /* Gelber Hintergrund für "In Arbeit" */
+            --bosch-work-yellow: #fff3cd; 
         }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
-        
-        .top-bar { 
-            height: 45px; width: 100%; 
-            background: linear-gradient(90deg, #d50000 0%, #003a6c 50%, #008a4f 100%); 
-            display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; box-sizing: border-box; 
-        }
-
+        .top-bar { height: 45px; width: 100%; background: linear-gradient(90deg, #d50000 0%, #003a6c 50%, #008a4f 100%); display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; box-sizing: border-box; }
         .header { background: white; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding: 20px; flex: 1; overflow: hidden; }
         .column { background: white; border-top: 5px solid var(--bosch-blue); display: flex; flex-direction: column; overflow: hidden; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .col-header { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-weight: bold; font-size: 1.2em; display: flex; justify-content: space-between; align-items: center; }
         .col-header a { text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px; font-size: 0.9em; cursor: pointer; }
         .machine-list { flex: 1; overflow-y: auto; padding: 10px; }
-        
-        .card { padding: 12px; border-bottom: 1px solid #eee; border-left: 8px solid #ccc; margin-bottom: 8px; background: #fff; transition: background 0.3s; position: relative; }
+        .card { padding: 12px; border-bottom: 1px solid #eee; border-left: 8px solid #ccc; margin-bottom: 8px; background: #fff; position: relative; }
         .card.warning { border-left-color: #ffa500; }
         .card.critical { border-left-color: var(--bosch-red); }
         .card.overdue { border-left-color: var(--bosch-dark-red); }
-
-        /* NEU: "In Arbeit" Style - stoppt das Blinken und färbt den Hintergrund */
-        .card.in-progress { 
-            background: var(--bosch-work-yellow) !important; 
-            animation: none !important; 
-            border-left-style: dashed; /* Optional: macht den Balken gestrichelt für "Status geändert" */
-        }
-
+        .card.in-progress { background: var(--bosch-work-yellow) !important; border-left-style: dashed; }
         @keyframes blink-red { 0% { background: #fff; } 50% { background: #ffcccc; } 100% { background: #fff; } }
         .blink { animation: blink-red 1s infinite; }
-        
         .card-info { display: flex; justify-content: space-between; align-items: flex-start; }
         .m-id { font-weight: bold; font-size: 1.1em; }
         .m-rest { font-weight: bold; font-size: 1.1em; }
         .m-paket { font-size: 0.85em; color: var(--bosch-red); font-weight: 600; margin-top: 2px; }
         select { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 2px; margin-top: 8px; }
-        /* Markierung für den ausgewählten Einsteller im Dropdown */
-        select.active-user { border: 2px solid var(--bosch-blue); background: #f0f7ff; }
-
         .nav-btn { padding: 8px 15px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; color: var(--bosch-blue); border-radius: 2px; font-size: 13px; }
         .btn-primary { background: var(--bosch-blue); color: white; border: none; }
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 4000; }
         .modal-box { background: white; padding: 30px; border-top: 8px solid var(--bosch-red); width: 450px; text-align: left; border-radius: 4px; }
-        input, textarea { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; box-sizing: border-box; font-family: inherit; }
+        input, textarea { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; box-sizing: border-box; }
         #timeout-bar-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background: #ddd; }
-        #timeout-bar { height: 100%; width: 0%; background: var(--bosch-red); transition: width 1s linear; }
+        #timeout-bar { height: 100%; width: 0%; background: var(--bosch-red); }
     </style>
 </head>
 <body onmousedown="resetInactivityTimer()" onkeydown="resetInactivityTimer()">
 
 <div class="top-bar">Zentrales Wartungs Dashboard W430</div>
 <div class="header">
-    <div>
-        <span style="color:var(--bosch-red);font-weight:900;font-size:24px;">BOSCH</span> 
-        <span style="font-weight:bold;color:#555;margin-left:10px;">Maschinenstatus</span>
-    </div>
+    <div><span style="color:var(--bosch-red);font-weight:900;font-size:24px;">BOSCH</span> <span style="font-weight:bold;color:#555;margin-left:10px;">Maschinenstatus</span></div>
     <div style="display:flex; gap:10px;">
-        <button class="nav-btn" onclick="openHelpModal()">ℹ️ Hilfe</button>
+        <button class="nav-btn" onclick="document.getElementById('helpModal').style.display='flex'">ℹ️ Hilfe</button>
         <button class="nav-btn" onclick="exportAuditLog()">📊 CSV Export</button>
-        <button id="authBtn" class="nav-btn" onclick="openLoginModal()">🔑 Login</button>
+        <button id="authBtn" class="nav-btn" onclick="handleLoginClick()">🔑 Login</button>
         <button class="nav-btn" onclick="openAdminModal()">⚙️ Einsteller</button>
     </div>
 </div>
@@ -94,7 +73,7 @@
 
 <div id="loginModal" class="modal">
     <div class="modal-box" style="text-align: center;">
-        <h3>Login</h3>
+        <h3 id="modalTitle">Login</h3>
         <input type="email" id="mEmail" placeholder="E-Mail">
         <input type="password" id="mPass" placeholder="Passwort">
         <div id="regExtra" style="display:none;">
@@ -110,7 +89,6 @@
 <div id="adminModal" class="modal">
     <div class="modal-box">
         <h3>Einsteller-Liste bearbeiten</h3>
-        <p style="font-size: 12px; color: #666;">Namen durch Komma trennen (z.B. Müller, Schmidt, Meyer):</p>
         <textarea id="einstellerTextarea" rows="6"></textarea>
         <button class="nav-btn btn-primary" style="width:100%; margin-top:10px;" onclick="saveEinstellerList()">Liste speichern</button>
         <button class="nav-btn" style="width:100%; margin-top:5px;" onclick="closeModals()">Abbrechen</button>
@@ -120,13 +98,11 @@
 <div id="helpModal" class="modal">
     <div class="modal-box">
         <h2 style="color:var(--bosch-blue); border-bottom: 2px solid var(--bosch-red); padding-bottom: 10px;">System-Anleitung</h2>
-        <div style="font-size: 0.9em; line-height: 1.4;">
-            <p><strong>1. Überwachung:</strong> Karten zeigen fällige Wartungen proportional zum Intervall.</p>
-            <p><strong>2. In Arbeit:</strong> Sobald ein Einsteller gewählt ist, stoppt das Blinken und die Karte wird gelb.</p>
-            <p><strong>3. Auto-Logout:</strong> Nach 70s Inaktivität wird der User ausgeloggt.</p>
-            <hr>
-            <strong>Systemverantwortlicher: Norman Schultheis</strong>
-        </div>
+        <p><strong>Status-Farben:</strong> Gelb (Warnung), Rot (Kritisch), Dunkelrot (Überfällig).</p>
+        <p><strong>In Arbeit:</strong> Gelbe Karte bedeutet, ein Einsteller ist zugewiesen.</p>
+        <p><strong>Auto-Logout:</strong> Nach 70s Inaktivität erfolgt ein Logout.</p>
+        <hr>
+        <strong>Verantwortlich: Norman Schultheis</strong>
         <button class="nav-btn btn-primary" style="width:100%; margin-top:20px;" onclick="closeModals()">Schließen</button>
     </div>
 </div>
@@ -140,11 +116,9 @@
     const UNO_STEPS = [{total:2000, pkg:"P1, P2"}, {total:4000, pkg:"P3"}, {total:10000, pkg:"P1"}, {total:14000, pkg:"P5"}, {total:18000, pkg:"P1, P2"}, {total:26000, pkg:"P1"}, {total:28000, pkg:"P6, P7"}, {total:30000, pkg:"P3"}, {total:34000, pkg:"P1, P2"}, {total:42000, pkg:"P1"}, {total:50000, pkg:"P1, P2"}, {total:56000, pkg:"P3"}, {total:58000, pkg:"P1"}, {total:66000, pkg:"P1, P2"}, {total:74000, pkg:"P1"}, {total:82000, pkg:"P1, P2"}, {total:90000, pkg:"P3"}, {total:98000, pkg:"P1"}, {total:104000, pkg:"WP RESET"}];
 
     let state = { config:{}, assignments:{}, agie:{}, uno:{}, he:{} };
-    let isReg = false;
-    let managedWindows = [];
-    let inactivityTimer;
-    let startTime;
+    let isReg = false, managedWindows = [], inactivityTimer, startTime;
 
+    // Timer Logik
     window.resetInactivityTimer = function() {
         clearTimeout(inactivityTimer);
         if (auth.currentUser) {
@@ -153,7 +127,6 @@
             updateBar();
         }
     }
-
     function updateBar() {
         if (!auth.currentUser) return;
         const elapsed = Date.now() - startTime;
@@ -161,14 +134,10 @@
         document.getElementById('timeout-bar').style.width = pct + "%";
         if (pct < 100) requestAnimationFrame(updateBar);
     }
-
     async function forceLogout() {
         managedWindows.forEach(win => { if(!win.closed) win.close(); });
         managedWindows = [];
-        if(auth.currentUser) {
-            await auth.signOut();
-            alert("Sitzung beendet (70s Inaktivität).");
-        }
+        if(auth.currentUser) { await auth.signOut(); alert("Sitzung beendet (Inaktivität)."); }
     }
 
     function openManagedWindow(url) {
@@ -176,6 +145,7 @@
         if(win) managedWindows.push(win);
     }
 
+    // Firebase Listener
     db.ref('config').on('value', s => { state.config = s.val() || {}; updateUI(); });
     db.ref('dashboardAssignments').on('value', s => { state.assignments = s.val() || {}; updateUI(); });
     db.ref('maintenanceState').on('value', s => { state.agie = s.val() || {}; updateUI(); });
@@ -189,10 +159,10 @@
         updateUI();
     });
 
-    async function writeLog(action, machine, detail) {
-        const user = auth.currentUser ? auth.currentUser.email : "Unbekannt";
-        await db.ref('auditLog').push({ timestamp: new Date().toISOString(), user, action, machine, detail });
-    }
+    // Auth & Modals
+    function handleLoginClick() { if(auth.currentUser) auth.signOut(); else document.getElementById('loginModal').style.display='flex'; }
+    function closeModals() { document.querySelectorAll('.modal').forEach(m => m.style.display='none'); }
+    function toggleM() { isReg=!isReg; document.getElementById('regExtra').style.display=isReg?'block':'none'; document.getElementById('modalTitle').innerText=isReg?'Registrieren':'Login'; }
 
     async function handleAuthAction() {
         const email = document.getElementById('mEmail').value, pass = document.getElementById('mPass').value;
@@ -205,29 +175,46 @@
         } catch(e) { alert(e.message); }
     }
 
+    function openAdminModal() {
+        if(prompt("Admin PW:") === state.config.AdminPW) {
+            document.getElementById('adminModal').style.display = 'flex';
+            document.getElementById('einstellerTextarea').value = (state.config.einstellerListe || []).join(', ');
+        } else alert("Falsches Passwort!");
+    }
+
+    async function saveEinstellerList() {
+        const list = document.getElementById('einstellerTextarea').value.split(',').map(s=>s.trim()).filter(s=>s!=="");
+        await db.ref('config/einstellerListe').set(list);
+        closeModals();
+    }
+
     async function safeSave(key, val) {
         if(!auth.currentUser) return alert("Bitte erst einloggen!");
-        if(prompt("Admin Passwort zur Bestätigung:") !== state.config.AdminPW) {
-            alert("Code falsch!"); updateUI(); return;
-        }
+        if(prompt("Admin Passwort zur Bestätigung:") !== state.config.AdminPW) return alert("Code falsch!");
         await db.ref(`dashboardAssignments/${key}`).set(val);
-        writeLog("Einsteller Zuweisung", key, `Neuer Einsteller: ${val}`);
         resetInactivityTimer();
     }
 
+    // CSV EXPORT (Optimiert für PowerBI/Excel)
     async function exportAuditLog() {
         if(prompt("Admin Passwort für Export:") !== state.config.AdminPW) return alert("Keine Berechtigung!");
         const snapshot = await db.ref('auditLog').once('value');
         const logs = snapshot.val();
         if(!logs) return alert("Keine Daten.");
-        let csv = "\ufeffZeitstempel;Benutzer;Aktion;Maschine;Details\n";
-        Object.values(logs).forEach(l => { csv += `${l.timestamp};${l.user};${l.action};${l.machine};${l.detail}\n`; });
+        
+        let csv = "\ufeffDatum;Uhrzeit;Benutzer;Aktion;Maschine;Details;Reststückzahl;Gesamtstückzahl;Paket;Status\n";
+        Object.values(logs).forEach(l => {
+            // Falls alte Logs existieren, Felder abfangen
+            csv += `${l.Datum || ''};${l.Uhrzeit || ''};${l.Benutzer || l.user || ''};${l.Aktion || l.action || ''};${l.Maschine || l.machine || ''};${l.Details || l.detail || ''};${l.Reststückzahl || ''};${l.Gesamtstückzahl || ''};${l.Paket || ''};${l.Status || ''}\n`;
+        });
+        
         const link = document.createElement("a");
         link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        link.setAttribute("download", `AuditLog.csv`);
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        link.download = `Wartungs_AuditLog.csv`;
+        link.click();
     }
 
+    // UI Rendering
     function updateUI() {
         renderCol('list-agie', 'count-agie', state.agie, 'A', 16000);
         renderCol('list-uno', 'count-uno', state.uno, 'U', 2000);
@@ -236,8 +223,7 @@
 
     function renderCol(id, cId, raw, pre, interval) {
         if(!raw.cloudRawData) return;
-        const warnLimit = interval * 0.125; 
-        const critLimit = interval * 0.03125; 
+        const warnLimit = interval * 0.125, critLimit = interval * 0.03125; 
 
         const data = raw.cloudRawData.map(item => {
             const sId = item.StationNo || item.STATIONNO;
@@ -264,46 +250,18 @@
             const assigned = state.assignments[m.key] || "";
             const isWorking = assigned !== "";
             const blinkClass = (m.rest <= 0 && !isWorking) ? 'blink overdue' : (m.rest <= 0 ? 'overdue' : (m.rest < critLimit ? 'critical' : 'warning'));
-            const workingClass = isWorking ? 'in-progress' : '';
-
             return `
-            <div class="card ${blinkClass} ${workingClass}">
+            <div class="card ${blinkClass} ${isWorking?'in-progress':''}">
                 <div class="card-info">
                     <div><div class="m-id">${m.id}</div><div class="m-paket">${m.pkg}</div></div>
                     <div class="m-rest">${m.rest.toLocaleString()}</div>
                 </div>
-                <select class="${isWorking ? 'active-user' : ''}" ${!auth.currentUser?'disabled':''} onchange="safeSave('${m.key}', this.value)">
+                <select ${!auth.currentUser?'disabled':''} onchange="safeSave('${m.key}', this.value)">
                     <option value="">-- Einsteller wählen --</option>
                     ${(state.config.einstellerListe||[]).map(e => `<option value="${e}" ${assigned===e?'selected':''}>${e}</option>`).join('')}
                 </select>
             </div>`;
         }).join('');
-    }
-
-    function openHelpModal() { document.getElementById('helpModal').style.display='flex'; }
-    function openLoginModal() { if(auth.currentUser) auth.signOut(); else document.getElementById('loginModal').style.display='flex'; }
-    function closeModals() { 
-        document.getElementById('loginModal').style.display='none'; 
-        document.getElementById('helpModal').style.display='none'; 
-        document.getElementById('adminModal').style.display='none'; 
-    }
-    function toggleM() { isReg=!isReg; document.getElementById('regExtra').style.display=isReg?'block':'none'; }
-    
-    function openAdminModal() {
-        if(prompt("Admin PW:") === state.config.AdminPW) {
-            document.getElementById('adminModal').style.display = 'flex';
-            document.getElementById('einstellerTextarea').value = (state.config.einstellerListe || []).join(', ');
-        } else {
-            alert("Code falsch!");
-        }
-    }
-
-    async function saveEinstellerList() {
-        const text = document.getElementById('einstellerTextarea').value;
-        const newList = text.split(',').map(s => s.trim()).filter(s => s !== "");
-        await db.ref('config/einstellerListe').set(newList);
-        writeLog("Einsteller Liste geändert", "System", `Neue Liste gespeichert`);
-        closeModals();
     }
 </script>
 </body>
