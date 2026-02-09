@@ -4,184 +4,88 @@
     <meta charset="UTF-8">
     <title>Unotron Wartung - Bosch V1.2</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-    
     <style>
-        :root { 
-            --bosch-red: #d50000; --bosch-dark-red: #8b0000; --bosch-blue: #003a6c; 
-            --bosch-green: #008a4f; --bosch-gray: #eff1f2; --bosch-orange: #ffa500;
-        }
+        :root { --bosch-red: #d50000; --bosch-green: #008a4f; --bosch-gray: #eff1f2; --bosch-blue: #003a6c; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-
-        .top-bar { 
-            height: 45px; width: 100%; 
-            background: linear-gradient(90deg, #d50000 0%, #d50000 25%, #003a6c 25%, #003a6c 50%, #00b5e2 50%, #00b5e2 75%, #008a4f 75%, #008a4f 100%); 
-            display: flex; align-items: center; padding: 0 15px; box-sizing: border-box; color: white;
-        }
-
-        .header { 
-            background: white; padding: 12px 25px; display: flex; justify-content: space-between; 
-            align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
-        }
-
-        .bosch-brand { display: flex; align-items: baseline; gap: 8px; }
-        .bosch-text { color: #d50000; font-size: 30px; font-weight: 900; letter-spacing: -1.5px; font-family: 'Arial Black', sans-serif; line-height: 1; }
-        
+        .top-bar { height: 45px; width: 100%; background: linear-gradient(90deg, #008a4f 0%, #003a6c 50%, #d50000 100%); display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; }
+        .header { background: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .main-layout { display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden; }
-        .content { flex: 3; background: white; padding: 20px; border-top: 4px solid var(--bosch-green); position: relative; }
+        .chart-area { flex: 3; background: white; padding: 20px; border-top: 4px solid var(--bosch-green); }
         .sidebar { flex: 1.5; background: white; border-top: 4px solid var(--bosch-blue); overflow-y: auto; padding: 10px; }
-
-        .control-row { 
-            display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; 
-            border-left: 8px solid #ccc; margin-bottom: 5px; gap: 8px; 
-        }
-
-        .nav-btn { 
-            padding: 6px 12px; cursor: pointer; border: 1px solid #ccc; background: white; 
-            font-weight: bold; color: var(--bosch-blue); font-size: 13px; border-radius: 2px; 
-        }
-        .btn-close { background: var(--bosch-red); color: white; border: none; }
-
-        @keyframes pulse-red { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-        .critical-pulse { animation: pulse-red 1.5s infinite ease-in-out; }
+        .row { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; gap: 10px; border-left: 8px solid #ccc; margin-bottom: 5px; }
+        .btn-wp { background: var(--bosch-red); color: white; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; }
+        .btn-cycle { padding: 5px 10px; cursor: pointer; border: 1px solid #ccc; background: white; }
+        @keyframes blink-red { 0% { background: #fff; } 50% { background: #ffcccc; } 100% { background: #fff; } }
+        .blink { animation: blink-red 1s infinite; }
     </style>
 </head>
-<body onmousedown="if(window.opener && window.opener.resetInactivityTimer) window.opener.resetInactivityTimer()">
-
-    <div class="top-bar">
-        <div style="font-weight: 600;">Wartungsintervall Unotron</div>
-    </div>
-
+<body>
+    <div class="top-bar">Unotron Wartungsübersicht</div>
     <div class="header">
-        <div class="bosch-brand"><span class="bosch-text">BOSCH</span><span style="color:#525f6b; font-weight:bold; margin-left:8px;">UNO-V1.2</span></div>
-        <button class="nav-btn btn-close" onclick="window.close()">❌ Fenster schließen</button>
+        <span style="font-size: 24px; color: var(--bosch-red); font-weight: 900;">BOSCH</span>
+        <button class="btn-wp" onclick="window.close()">❌ Fenster schließen</button>
     </div>
-
     <div class="main-layout">
-        <div class="content">
-            <canvas id="mainChart"></canvas>
-        </div>
-        <div class="sidebar" id="machineList">Lade Daten...</div>
+        <div class="chart-area"><canvas id="mainChart"></canvas></div>
+        <div class="sidebar" id="machineList">Lade...</div>
     </div>
 
     <script>
-        const UNO_STEPS = [
-            { total: 2000, pkg: "P1, P2" }, { total: 4000, pkg: "P3" }, { total: 10000, pkg: "P1" },
-            { total: 14000, pkg: "P5" }, { total: 18000, pkg: "P1, P2" }, { total: 26000, pkg: "P1" },
-            { total: 28000, pkg: "P6, P7" }, { total: 30000, pkg: "P3" }, { total: 34000, pkg: "P1, P2" },
-            { total: 42000, pkg: "P1" }, { total: 50000, pkg: "P1, P2" }, { total: 56000, pkg: "P3" },
-            { total: 58000, pkg: "P1" }, { total: 66000, pkg: "P1, P2" }, { total: 74000, pkg: "P1" },
-            { total: 82000, pkg: "P1, P2" }, { total: 90000, pkg: "P3" }, { total: 98000, pkg: "P1" },
-            { total: 104000, pkg: "WP RESET" }
-        ];
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg",
-            authDomain: "bosch-agie-wartung.firebaseapp.com",
-            databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "bosch-agie-wartung"
-        };
+        const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        const auth = firebase.auth();
-
-        let state = { cloudRawData: [], extraCycles: {} };
+        const UNO_STEPS = [{total:2000}, {total:4000}, {total:10000}, {total:14000}, {total:18000}, {total:26000}, {total:28000}, {total:30000}, {total:34000}, {total:42000}, {total:50000}, {total:56000}, {total:58000}, {total:66000}, {total:74000}, {total:82000}, {total:90000}, {total:98000}, {total:104000}];
         let chart = null;
-
-        auth.onAuthStateChanged(user => { if(!user) window.close(); });
 
         db.ref('maintenanceStateUnotron').on('value', snap => {
             const val = snap.val() || {};
-            state.cloudRawData = val.cloudRawData || [];
-            state.extraCycles = val.extraCycles || {};
-            updateUI();
+            const raw = val.cloudRawData || [];
+            const cycles = val.extraCycles || {};
+            
+            const data = raw.map(item => {
+                const id = item.STATIONNO;
+                const ist = parseInt(item["COUNT(*)"]) || 0;
+                const cyc = cycles[id] || 0;
+                const target = UNO_STEPS[cyc]?.total || (104000 + (cyc-18)*2000);
+                const rest = target - ist;
+                let color = "#008a4f";
+                // Proportionale Grenzen (2k Basis pro Schritt)
+                if(rest <= 0) color = "#8b0000";
+                else if(rest <= 60) color = "#d50000";
+                else if(rest <= 250) color = "#ffa500";
+                return { id, rest, color, cyc };
+            }).sort((a,b) => a.rest - b.rest);
+
+            renderList(data);
+            renderChart(data);
         });
 
-        function updateUI() {
-            if (!state.cloudRawData.length) return;
-
-            const data = state.cloudRawData.map(item => {
-                const id = item.STATIONNO;
-                const ist = parseInt(item["COUNT(*)"] || 0);
-                const cIdx = state.extraCycles[id] || 0;
-                
-                let target = UNO_STEPS[cIdx] || { total: 104000 + ((cIdx - 18) * 5000), pkg: "Folge" };
-                const rest = target.total - ist;
-                
-                const fullCycles = Math.floor(cIdx / 19);
-                const currentTotalCount = (fullCycles * 104000) + ist;
-
-                let color = "--bosch-green";
-                if (rest <= 0) color = "--bosch-dark-red";
-                else if (rest < 500) color = "--bosch-red";
-                else if (rest < 2000) color = "--bosch-orange";
-
-                return { id, rest, color, ist, cIdx, pkg: target.pkg, currentTotalCount };
-            }).sort((a, b) => a.rest - b.rest);
-
-            const list = document.getElementById('machineList');
-            list.innerHTML = data.map(d => `
-                <div class="control-row ${d.rest <= 0 ? 'critical-pulse' : ''}" style="border-left-color: var(${d.color});">
-                    <div style="flex: 2;">
-                        <b>UNO-${d.id}</b><br>
-                        <small>${d.pkg} (@${d.currentTotalCount.toLocaleString()})</small>
-                    </div>
-                    <div style="flex: 1; text-align: right; font-weight: bold; color: var(${d.color});">
-                        ${d.rest.toLocaleString()}
-                    </div>
-                    <div style="display: flex; gap: 5px; align-items: center; margin-left: 10px;">
-                        <button class="nav-btn" style="background:var(--bosch-red); color:white; border:none;" onclick="setWP('${d.id}')">WP</button>
-                        <button class="nav-btn" onclick="changeCycle('${d.id}', -1)">-</button>
-                        <span style="min-width: 15px; text-align: center">${d.cIdx}</span>
-                        <button class="nav-btn" onclick="changeCycle('${d.id}', 1)">+</button>
-                    </div>
-                </div>
-            `).join('');
-
-            renderChart(data);
+        function renderList(data) {
+            document.getElementById('machineList').innerHTML = data.map(d => `
+                <div class="row ${d.rest <= 0 ? 'blink' : ''}" style="border-left-color:${d.color}">
+                    <div style="flex:1"><b>UNO-${d.id}</b></div>
+                    <div style="flex:1; text-align:right;"><b>${d.rest.toLocaleString()}</b></div>
+                    <button class="btn-cycle" onclick="changeC('${d.id}', -1)">-</button>
+                    <span>${d.cyc}</span>
+                    <button class="btn-cycle" onclick="changeC('${d.id}', 1)">+</button>
+                </div>`).join('');
         }
 
-        async function changeCycle(id, val) {
-            const current = state.extraCycles[id] || 0;
-            const newVal = Math.max(0, current + val);
-            await db.ref(`maintenanceStateUnotron/extraCycles/${id}`).set(newVal);
-        }
-
-        async function setWP(id) {
-            if(confirm("Wartungsplan Reset für UNO-" + id + "?")) {
-                await db.ref(`maintenanceStateUnotron/extraCycles/${id}`).set(18);
-            }
+        async function changeC(id, v) {
+            const s = await db.ref(`maintenanceStateUnotron/extraCycles/${id}`).once('value');
+            db.ref(`maintenanceStateUnotron/extraCycles/${id}`).set(Math.max(0, (s.val()||0) + v));
         }
 
         function renderChart(data) {
             const ctx = document.getElementById('mainChart').getContext('2d');
             if(chart) chart.destroy();
             chart = new Chart(ctx, {
-                type: 'bar',
-                plugins: [ChartDataLabels],
-                data: {
-                    labels: data.map(d => "UNO-" + d.id),
-                    datasets: [{
-                        data: data.map(d => d.rest),
-                        backgroundColor: data.map(d => `var(${d.color})`)
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        datalabels: {
-                            anchor: 'end', align: 'top', offset: 10, rotation: -90,
-                            formatter: v => v.toLocaleString(),
-                            font: { weight: 'bold', size: 11 }
-                        }
-                    },
-                    scales: { y: { beginAtZero: true } }
-                }
+                type: 'bar', plugins: [ChartDataLabels],
+                data: { labels: data.map(d=>"UNO-"+d.id), datasets: [{ data: data.map(d=>d.rest), backgroundColor: data.map(d=>d.color) }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'top', rotation: -90, font: { weight: 'bold' } } } }
             });
         }
     </script>
