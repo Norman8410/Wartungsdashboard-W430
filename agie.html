@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Agie Wartungsübersicht</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
@@ -18,34 +19,42 @@
         .row { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; gap: 10px; border-left: 8px solid #ccc; margin-bottom: 5px; }
         .btn-wp { background: var(--bosch-red); color: white; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; border-radius: 2px; }
         .btn-cycle { padding: 5px 10px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; border-radius: 2px; }
-        .btn-cycle:active, .btn-wp:active { transform: translateY(1px); filter: brightness(0.9); }
+        .btn-cycle:disabled, .btn-wp:disabled { opacity: 0.3; cursor: not-allowed; }
         @keyframes blink-red { 0% { background: #fff; } 50% { background: #ffcccc; } 100% { background: #fff; } }
         .blink { animation: blink-red 1s infinite; }
+        #auth-status { font-size: 12px; color: #666; font-weight: normal; }
     </style>
 </head>
 <body>
     <div class="top-bar">Agie Wartungsübersicht</div>
     <div class="header">
-        <span style="font-size: 24px; color: var(--bosch-red); font-weight: 900;">BOSCH</span>
+        <div>
+            <span style="font-size: 24px; color: var(--bosch-red); font-weight: 900;">BOSCH</span>
+            <span id="auth-status" style="margin-left: 15px;">Prüfe Berechtigung...</span>
+        </div>
         <button class="btn-wp" onclick="window.close()">❌ Fenster schließen</button>
     </div>
     <div class="main-layout">
         <div class="chart-area"><canvas id="mainChart"></canvas></div>
-        <div class="sidebar" id="machineList">Verbindung wird hergestellt...</div>
+        <div class="sidebar" id="machineList">Lade Daten...</div>
     </div>
 
     <script>
-        const firebaseConfig = { 
-            apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", 
-            databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app" 
-        };
+        const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung" };
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        const db = firebase.database(), auth = firebase.auth();
         
         const AGIE_PKGS = ["P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/5", "P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/6/7", "P1/2"];
         let chart = null;
+        let currentUser = null;
 
-        // Daten einmalig und dann bei Änderungen laden
+        // Login Status überwachen
+        auth.onAuthStateChanged(user => {
+            currentUser = user;
+            document.getElementById('auth-status').innerText = user ? `Eingeloggt als: ${user.email}` : "⚠️ Nur Lesemodus (Bitte im Dashboard einloggen)";
+            document.querySelectorAll('.btn-wp, .btn-cycle').forEach(btn => btn.disabled = !user);
+        });
+
         db.ref('maintenanceState').on('value', snap => {
             const val = snap.val() || {};
             const raw = val.cloudRawData || [];
@@ -60,61 +69,38 @@
                 const cyc = cycles[id] || 0;
                 const target = 16000 + (cyc * 16000);
                 const rest = target - ist;
-                const pkg = AGIE_PKGS[Math.min(cyc, AGIE_PKGS.length - 1)];
-                
-                let color = "#008a4f"; 
-                if(rest <= 0) color = "#8b0000"; 
-                else if(rest <= 500) color = "#d50000"; 
-                else if(rest <= 2000) color = "#ffa500"; 
-                
-                return { id, rest, ist, color, cyc, pkg, totalParts };
+                return { id, rest, ist, color: getC(rest), cyc, pkg: AGIE_PKGS[Math.min(cyc, AGIE_PKGS.length-1)], totalParts };
             }).sort((a,b) => a.rest - b.rest);
-
             renderList(data);
             renderChart(data);
         });
+
+        function getC(r) { return r <= 0 ? "#8b0000" : (r <= 500 ? "#d50000" : (r <= 2000 ? "#ffa500" : "#008a4f")); }
 
         function renderList(data) {
             document.getElementById('machineList').innerHTML = data.map(d => `
                 <div class="row ${d.rest <= 0 ? 'blink' : ''}" style="border-left-color:${d.color}">
                     <div style="flex:1"><b>A-${d.id}</b></div>
                     <div style="flex:1; text-align:right;"><b>${d.rest.toLocaleString()}</b></div>
-                    <button class="btn-wp" onclick="resetWP('${d.id}', ${d.totalParts})">WP</button>
-                    <button class="btn-cycle" onclick="changeC('${d.id}', -1)">-</button>
-                    <span style="min-width: 25px; text-align: center; font-weight: bold;">${d.cyc}</span>
-                    <button class="btn-cycle" onclick="changeC('${d.id}', 1)">+</button>
+                    <button class="btn-wp" ${!currentUser?'disabled':''} onclick="resetWP('${d.id}', ${d.totalParts})">WP</button>
+                    <button class="btn-cycle" ${!currentUser?'disabled':''} onclick="changeC('${d.id}', -1)">-</button>
+                    <span style="min-width: 20px; text-align: center;">${d.cyc}</span>
+                    <button class="btn-cycle" ${!currentUser?'disabled':''} onclick="changeC('${d.id}', 1)">+</button>
                 </div>`).join('');
         }
 
-        // ABSOLUTE SPEICHERUNG: Nutzt .update() statt .set() für bessere Stabilität
         async function changeC(id, v) {
-            const ref = db.ref(`maintenanceState/extraCycles`);
-            const snap = await ref.child(id).once('value');
-            const current = snap.val() || 0;
-            const newVal = Math.max(0, current + v);
-            
-            // Wir schreiben gezielt nur dieses eine Feld neu
-            try {
-                await ref.update({ [id]: newVal });
-                console.log(`Zyklus für A-${id} auf ${newVal} gesetzt.`);
-            } catch (e) {
-                alert("Fehler beim Speichern: " + e.message);
-            }
+            if(!currentUser) return alert("Nicht berechtigt!");
+            const ref = db.ref(`maintenanceState/extraCycles/${id}`);
+            const snap = await ref.once('value');
+            await ref.set(Math.max(0, (snap.val() || 0) + v));
         }
 
         async function resetWP(id, totalParts) {
-            if(confirm(`Wartungsplan für A-${id} wirklich zurücksetzen?\nMaschinenstand: ${totalParts}`)) {
-                try {
-                    // Update beider Werte gleichzeitig (Atomarer Schreibvorgang)
-                    const updates = {};
-                    updates[`maintenanceState/agieOffsets/${id}`] = totalParts;
-                    updates[`maintenanceState/extraCycles/${id}`] = 0;
-                    
-                    await db.ref().update(updates);
-                    console.log(`Reset für A-${id} erfolgreich.`);
-                } catch (e) {
-                    alert("Fehler beim Reset: " + e.message);
-                }
+            if(!currentUser) return alert("Nicht berechtigt!");
+            if(confirm(`Reset für A-${id}?`)) {
+                await db.ref(`maintenanceState/agieOffsets/${id}`).set(totalParts);
+                await db.ref(`maintenanceState/extraCycles/${id}`).set(0);
             }
         }
 
@@ -122,34 +108,9 @@
             const ctx = document.getElementById('mainChart').getContext('2d');
             if(chart) chart.destroy();
             chart = new Chart(ctx, {
-                type: 'bar', 
-                plugins: [ChartDataLabels],
-                data: { 
-                    labels: data.map(d => "A-" + d.id), 
-                    datasets: [{ 
-                        data: data.map(d => d.rest), 
-                        backgroundColor: data.map(d => d.color)
-                    }] 
-                },
-                options: { 
-                    responsive: true, maintainAspectRatio: false, 
-                    plugins: { 
-                        legend: { display: false }, 
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const d = data[context.dataIndex];
-                                    return [
-                                        `Paket: ${d.pkg}`,
-                                        `Stück seit Reset: ${d.ist.toLocaleString()}`,
-                                        `Rest bis Wartung: ${d.rest.toLocaleString()}`
-                                    ];
-                                }
-                            }
-                        },
-                        datalabels: { anchor: 'end', align: 'top', rotation: -90, font: { weight: 'bold' } } 
-                    } 
-                }
+                type: 'bar', plugins: [ChartDataLabels],
+                data: { labels: data.map(d => "A-" + d.id), datasets: [{ data: data.map(d => d.rest), backgroundColor: data.map(d => d.color) }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'top', rotation: -90, font: { weight: 'bold' } } } }
             });
         }
     </script>
