@@ -2,22 +2,22 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Agie Wartung - Bosch V1.1</title>
+    <title>Agie Wartungsübersicht</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <style>
-        :root { --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-gray: #eff1f2; --critical-red: #8b0000; }
+        :root { --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-gray: #eff1f2; --bosch-green: #008a4f; --bosch-orange: #ffa500; --bosch-dark-red: #8b0000; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        .top-bar { height: 45px; width: 100%; background: linear-gradient(90deg, #d50000 0%, #003a6c 50%, #008a4f 100%); display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; }
+        .top-bar { height: 45px; width: 100%; background: linear-gradient(90deg, #d50000 0%, #003a6c 50%, #008a4f 100%); display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; box-sizing: border-box; }
         .header { background: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .main-layout { display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden; }
-        .chart-area { flex: 3; background: white; padding: 20px; border-top: 4px solid var(--bosch-blue); }
-        .sidebar { flex: 1.5; background: white; border-top: 4px solid var(--bosch-red); overflow-y: auto; padding: 10px; }
+        .chart-area { flex: 3; background: white; padding: 20px; border-top: 4px solid var(--bosch-red); border-radius: 4px; }
+        .sidebar { flex: 1.5; background: white; border-top: 4px solid var(--bosch-blue); overflow-y: auto; padding: 10px; border-radius: 4px; }
         .row { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; gap: 10px; border-left: 8px solid #ccc; margin-bottom: 5px; }
         .btn-wp { background: var(--bosch-red); color: white; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; }
-        .btn-cycle { padding: 5px 10px; cursor: pointer; border: 1px solid #ccc; background: white; }
+        .btn-cycle { padding: 5px 10px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; }
         @keyframes blink-red { 0% { background: #fff; } 50% { background: #ffcccc; } 100% { background: #fff; } }
         .blink { animation: blink-red 1s infinite; }
     </style>
@@ -30,16 +30,18 @@
     </div>
     <div class="main-layout">
         <div class="chart-area"><canvas id="mainChart"></canvas></div>
-        <div class="sidebar" id="machineList">Lade...</div>
+        <div class="sidebar" id="machineList">Lade Daten...</div>
     </div>
 
     <script>
         const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        
         const AGIE_PKGS = ["P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/5", "P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/6/7", "P1/2"];
         let chart = null;
 
+        // Echtzeit-Überwachung der Datenbank
         db.ref('maintenanceState').on('value', snap => {
             const val = snap.val() || {};
             const raw = val.cloudRawData || [];
@@ -48,15 +50,20 @@
             
             const data = raw.map(item => {
                 const id = item.StationNo;
-                const ist = (parseInt(item.Parts) || 0) - (offsets[id] || 0);
+                const totalParts = parseInt(item.Parts) || 0;
+                const offset = offsets[id] || 0;
+                const ist = totalParts - offset;
                 const cyc = cycles[id] || 0;
-                const rest = (16000 + cyc * 16000) - ist;
-                const pkg = AGIE_PKGS[Math.min(cyc, AGIE_PKGS.length-1)];
-                let color = "#008a4f";
-                if(rest <= 0) color = "#8b0000";
-                else if(rest <= 500) color = "#d50000";
-                else if(rest <= 2000) color = "#ffa500";
-                return { id, rest, ist, color, cyc, pkg };
+                const target = 16000 + (cyc * 16000);
+                const rest = target - ist;
+                const pkg = AGIE_PKGS[Math.min(cyc, AGIE_PKGS.length - 1)];
+                
+                let color = "#008a4f"; // Grün
+                if(rest <= 0) color = "#8b0000"; // Dunkelrot
+                else if(rest <= 500) color = "#d50000"; // Bosch Rot
+                else if(rest <= 2000) color = "#ffa500"; // Orange
+                
+                return { id, rest, ist, color, cyc, pkg, totalParts };
             }).sort((a,b) => a.rest - b.rest);
 
             renderList(data);
@@ -68,23 +75,30 @@
                 <div class="row ${d.rest <= 0 ? 'blink' : ''}" style="border-left-color:${d.color}">
                     <div style="flex:1"><b>A-${d.id}</b></div>
                     <div style="flex:1; text-align:right;"><b>${d.rest.toLocaleString()}</b></div>
-                    <button class="btn-wp" onclick="resetWP('${d.id}')">WP</button>
+                    <button class="btn-wp" onclick="resetWP('${d.id}', ${d.totalParts})">WP</button>
                     <button class="btn-cycle" onclick="changeC('${d.id}', -1)">-</button>
-                    <span>${d.cyc}</span>
+                    <span style="min-width: 20px; text-align: center;">${d.cyc}</span>
                     <button class="btn-cycle" onclick="changeC('${d.id}', 1)">+</button>
                 </div>`).join('');
         }
 
+        // Funktion zum Ändern des Wartungs-Zyklus (P1, P2...)
         async function changeC(id, v) {
-            const s = await db.ref(`maintenanceState/extraCycles/${id}`).once('value');
-            db.ref(`maintenanceState/extraCycles/${id}`).set(Math.max(0, (s.val()||0) + v));
+            const ref = db.ref(`maintenanceState/extraCycles/${id}`);
+            const snap = await ref.once('value');
+            const current = snap.val() || 0;
+            const newVal = Math.max(0, current + v);
+            await ref.set(newVal);
         }
 
-        async function resetWP(id) {
-            if(confirm("WP-Reset für A-"+id+"?")) {
-                const s = await db.ref(`maintenanceState/agieOffsets/${id}`).once('value');
-                db.ref(`maintenanceState/agieOffsets/${id}`).set((s.val()||0) + 208000);
-                db.ref(`maintenanceState/extraCycles/${id}`).set(0);
+        // Funktion für den Wartungsplan-Reset (WP Knopf)
+        async function resetWP(id, totalParts) {
+            if(confirm(`Wartungsplan für A-${id} wirklich zurücksetzen? (Zähler wird auf 0 gesetzt)`)) {
+                // Der neue Offset ist der aktuelle Gesamtstand der Maschine
+                await db.ref(`maintenanceState/agieOffsets/${id}`).set(totalParts);
+                // Die Extra-Zyklen (Pakete) werden wieder auf 0 gesetzt
+                await db.ref(`maintenanceState/extraCycles/${id}`).set(0);
+                alert(`Reset für A-${id} erfolgreich durchgeführt.`);
             }
         }
 
@@ -92,8 +106,15 @@
             const ctx = document.getElementById('mainChart').getContext('2d');
             if(chart) chart.destroy();
             chart = new Chart(ctx, {
-                type: 'bar', plugins: [ChartDataLabels],
-                data: { labels: data.map(d=>"A-"+d.id), datasets: [{ data: data.map(d=>d.rest), backgroundColor: data.map(d=>d.color), ist: data.map(d=>d.ist), pkg: data.map(d=>d.pkg) }] },
+                type: 'bar', 
+                plugins: [ChartDataLabels],
+                data: { 
+                    labels: data.map(d => "A-" + d.id), 
+                    datasets: [{ 
+                        data: data.map(d => d.rest), 
+                        backgroundColor: data.map(d => d.color)
+                    }] 
+                },
                 options: { 
                     responsive: true, maintainAspectRatio: false, 
                     plugins: { 
@@ -103,9 +124,9 @@
                                 label: function(context) {
                                     const d = data[context.dataIndex];
                                     return [
-                                        `Offene Wartung: ${d.pkg}`,
-                                        `Gesamt Stückzahl seit WP-Reset: ${d.ist.toLocaleString()}`,
-                                        `Rest Stückzahl bis Wartung: ${d.rest.toLocaleString()}`
+                                        `Paket: ${d.pkg}`,
+                                        `Stück seit Reset: ${d.ist.toLocaleString()}`,
+                                        `Rest bis Wartung: ${d.rest.toLocaleString()}`
                                     ];
                                 }
                             }
