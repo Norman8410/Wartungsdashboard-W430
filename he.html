@@ -51,11 +51,10 @@
                 const cyc = cycles[id] || 0;
                 const rest = (156000 + cyc * 156000) - ist;
                 let color = "#008a4f";
-                // Proportionale Grenzen (156k Basis)
                 if(rest <= 0) color = "#8b0000";
                 else if(rest <= 4800) color = "#d50000";
                 else if(rest <= 19500) color = "#ffa500";
-                return { id, rest, color, cyc };
+                return { id, rest, ist, color, cyc };
             }).sort((a,b) => a.rest - b.rest);
 
             renderList(data);
@@ -93,7 +92,25 @@
             chart = new Chart(ctx, {
                 type: 'bar', plugins: [ChartDataLabels],
                 data: { labels: data.map(d=>"HE-"+d.id), datasets: [{ data: data.map(d=>d.rest), backgroundColor: data.map(d=>d.color) }] },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'top', rotation: -90, font: { weight: 'bold' } } } }
+                options: { 
+                    responsive: true, maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { display: false }, 
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const d = data[context.dataIndex];
+                                    return [
+                                        `Offene Wartung: Standard`,
+                                        `Gesamt Stückzahl seit WP-Reset: ${d.ist.toLocaleString()}`,
+                                        `Rest Stückzahl bis Wartung: ${d.rest.toLocaleString()}`
+                                    ];
+                                }
+                            }
+                        },
+                        datalabels: { anchor: 'end', align: 'top', rotation: -90, font: { weight: 'bold' } } 
+                    } 
+                }
             });
         }
     </script>
