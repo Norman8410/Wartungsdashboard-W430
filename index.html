@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Zentral-Dashboard Wartung - Bosch</title>
+    <title>Zentrales Wartungs Dashboard W430</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -12,7 +12,14 @@
             --bosch-green: #008a4f; --bosch-gray: #eff1f2; --bosch-dark-red: #8b0000;
         }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
-        .top-bar { height: 10px; background: linear-gradient(90deg, #d50000 0%, #d50000 25%, #003a6c 25%, #003a6c 50%, #00b5e2 50%, #00b5e2 75%, #008a4f 75%, #008a4f 100%); }
+        
+        /* Einheitlicher Agie-Header Balken */
+        .top-bar { 
+            height: 45px; width: 100%; 
+            background: linear-gradient(90deg, #d50000 0%, #003a6c 50%, #008a4f 100%); 
+            display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; box-sizing: border-box; 
+        }
+
         .header { background: white; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding: 20px; flex: 1; overflow: hidden; }
         .column { background: white; border-top: 5px solid var(--bosch-blue); display: flex; flex-direction: column; overflow: hidden; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
@@ -20,9 +27,12 @@
         .col-header a { text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px; font-size: 0.9em; cursor: pointer; }
         .machine-list { flex: 1; overflow-y: auto; padding: 10px; }
         .card { padding: 12px; border-bottom: 1px solid #eee; border-left: 8px solid #ccc; margin-bottom: 8px; background: #fff; }
+        
+        /* Proportionale Logik-Farben */
         .card.warning { border-left-color: #ffa500; }
         .card.critical { border-left-color: var(--bosch-red); animation: pulse 2s infinite; }
         .card.overdue { border-left-color: var(--bosch-dark-red); animation: pulse 1s infinite; }
+        
         .card-info { display: flex; justify-content: space-between; align-items: flex-start; }
         .m-id { font-weight: bold; font-size: 1.1em; }
         .m-rest { font-weight: bold; font-size: 1.1em; }
@@ -40,11 +50,11 @@
 </head>
 <body onmousedown="resetInactivityTimer()" onkeydown="resetInactivityTimer()">
 
-<div class="top-bar"></div>
+<div class="top-bar">Zentrales Wartungs Dashboard W430</div>
 <div class="header">
     <div>
         <span style="color:var(--bosch-red);font-weight:900;font-size:24px;">BOSCH</span> 
-        <span style="font-weight:bold;color:#555;margin-left:10px;">Zentrales Wartungs Dashboard W430</span>
+        <span style="font-weight:bold;color:#555;margin-left:10px;">Maschinenstatus</span>
     </div>
     <div style="display:flex; gap:10px;">
         <button class="nav-btn" onclick="openHelpModal()">ℹ️ Hilfe</button>
@@ -90,7 +100,7 @@
     <div class="modal-box">
         <h2 style="color:var(--bosch-blue); border-bottom: 2px solid var(--bosch-red); padding-bottom: 10px;">System-Anleitung</h2>
         <div style="font-size: 0.9em; line-height: 1.4;">
-            <p><strong>1. Überwachung:</strong> Gelbe/Rote Karten zeigen fällige Wartungen proportional zum Intervall.</p>
+            <p><strong>1. Überwachung:</strong> Karten zeigen fällige Wartungen proportional zum Intervall.</p>
             <p><strong>2. Sicherheit:</strong> Jede Änderung wird im Audit-Log gespeichert.</p>
             <p><strong>3. Auto-Logout:</strong> Nach 70s Inaktivität wird der User ausgeloggt.</p>
             <hr>
@@ -167,7 +177,7 @@
         const email = document.getElementById('mEmail').value, pass = document.getElementById('mPass').value;
         try {
             if(isReg) {
-                if(document.getElementById('mInvite').value !== state.config.inviteCode) return alert("Code falsch!");
+                if(document.getElementById('mInvite').value !== "bosch2026") return alert("Code falsch!");
                 await auth.createUserWithEmailAndPassword(email, pass);
             } else { await auth.signInWithEmailAndPassword(email, pass); }
             closeModals();
@@ -198,18 +208,15 @@
     }
 
     function updateUI() {
-        // Agie: 16k Intervall -> 2000 (12.5%) gelb, 500 (3.1%) rot
         renderCol('list-agie', 'count-agie', state.agie, 'A', 16000);
-        // Unotron: 2k Intervall -> 250 (12.5%) gelb, 60 (3.1%) rot
         renderCol('list-uno', 'count-uno', state.uno, 'U', 2000);
-        // HE: 156k Intervall -> 19500 (12.5%) gelb, 4800 (3.1%) rot
         renderCol('list-he', 'count-he', state.he, 'H', 156000);
     }
 
     function renderCol(id, cId, raw, pre, interval) {
         if(!raw.cloudRawData) return;
-        const warnLimit = interval * 0.125; // 12.5%
-        const critLimit = interval * 0.03125; // 3.125%
+        const warnLimit = interval * 0.125; 
+        const critLimit = interval * 0.03125; 
 
         const data = raw.cloudRawData.map(item => {
             const sId = item.StationNo || item.STATIONNO;
