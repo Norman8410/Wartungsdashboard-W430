@@ -2,22 +2,25 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Unotron Wartung</title>
+    <title>Unotron Wartungsübersicht</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <style>
-        :root { --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-gray: #eff1f2; --bosch-green: #008a4f; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
-        .top-bar { height: 45px; width: 100%; background: linear-gradient(90deg, #d50000 0%, #003a6c 50%, #008a4f 100%); display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; }
+        :root { --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-gray: #eff1f2; --bosch-green: #008a4f; --bosch-orange: #ffa500; --bosch-dark-red: #8b0000; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .top-bar { height: 45px; width: 100%; background: linear-gradient(90deg, #d50000 0%, #003a6c 50%, #008a4f 100%); display: flex; align-items: center; padding: 0 15px; color: white; font-weight: bold; box-sizing: border-box; }
         .header { background: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .main-layout { display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden; }
         .chart-area { flex: 3; background: white; padding: 20px; border-top: 4px solid var(--bosch-green); border-radius: 4px; }
         .sidebar { flex: 1.5; background: white; border-top: 4px solid var(--bosch-blue); overflow-y: auto; padding: 10px; border-radius: 4px; }
         .row { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; gap: 10px; border-left: 8px solid #ccc; margin-bottom: 5px; }
-        .btn-cycle { padding: 5px 10px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; }
+        .btn-cycle { padding: 5px 10px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; border-radius: 2px; }
+        .btn-cycle:disabled { opacity: 0.3; cursor: not-allowed; }
+        @keyframes blink-red { 0% { background: #fff; } 50% { background: #ffcccc; } 100% { background: #fff; } }
+        .blink { animation: blink-red 1s infinite; }
         #auth-status { font-size: 12px; color: #666; }
     </style>
 </head>
@@ -27,8 +30,7 @@
         <div><span style="font-size: 24px; color: var(--bosch-red); font-weight: 900;">BOSCH</span><span id="auth-status" style="margin-left: 15px;">Prüfe Berechtigung...</span></div>
         <button class="btn-cycle" onclick="window.close()">❌ Schließen</button>
     </div>
-    <div class="main-layout"><div class="chart-area"><canvas id="mainChart"></canvas></div><div class="sidebar" id="machineList">Lade...</div></div>
-
+    <div class="main-layout"><div class="chart-area"><canvas id="mainChart"></canvas></div><div class="sidebar" id="machineList">Lade Daten...</div></div>
     <script>
         const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung" };
         firebase.initializeApp(firebaseConfig);
@@ -42,24 +44,12 @@
             document.querySelectorAll('.btn-cycle').forEach(btn => btn.disabled = !user);
         });
 
-        async function writeLog(action, machine, detail, rest, gesamt, paket) {
-            const user = auth.currentUser ? auth.currentUser.email : "Unbekannt";
-            const status = (action.includes("STORNO")) ? "Storniert" : (rest <= 0 ? "Erledigt" : "Erledigt vorgezogen");
-            const j = new Date();
-            await db.ref('auditLog').push({
-                Datum: j.toLocaleDateString('de-DE'), Uhrzeit: j.toLocaleTimeString('de-DE'),
-                Benutzer: user, Aktion: action, Maschine: machine, Details: detail,
-                Reststückzahl: rest, Gesamtstückzahl: gesamt, Paket: paket, Status: status
-            });
-        }
-
         db.ref('maintenanceStateUnotron').on('value', snap => {
             const val = snap.val() || {}, raw = val.cloudRawData || [], cycles = val.extraCycles || {};
             const data = raw.map(item => {
                 const id = item.STATIONNO || item["StationNo"], ist = parseInt(item["COUNT(*)"] || 0), cyc = cycles[id] || 0;
                 const tObj = UNO_STEPS[cyc] || { total: 104000+((cyc-18)*5000), pkg: "Folge" };
-                const rest = tObj.total - ist;
-                return { id, rest, ist, color: getC(rest), cyc, pkg: tObj.pkg };
+                return { id, rest: tObj.total - ist, ist, color: getC(tObj.total - ist), cyc, pkg: tObj.pkg };
             }).sort((a,b) => a.rest - b.rest);
             renderList(data); renderChart(data);
         });
@@ -68,41 +58,41 @@
 
         function renderList(data) {
             document.getElementById('machineList').innerHTML = data.map(d => `
-                <div class="row" style="border-left-color:${d.color}">
+                <div class="row ${d.rest <= 0 ? 'blink' : ''}" style="border-left-color:${d.color}">
                     <div style="flex:1"><b>U-${d.id}</b></div>
                     <div style="flex:1; text-align:right;"><b>${d.rest.toLocaleString()}</b></div>
                     <button class="btn-cycle" onclick="changeC('${d.id}', -1)">-</button>
-                    <span style="min-width: 20px; text-align: center;">${d.cyc}</span>
+                    <span style="min-width: 20px; text-align: center; font-weight: bold;">${d.cyc}</span>
                     <button class="btn-cycle" onclick="changeC('${d.id}', 1)">+</button>
                 </div>`).join('');
         }
 
         async function changeC(id, v) {
             if(!currentUser) return;
-            const snapS = await db.ref(`maintenanceStateUnotron`).once('value');
-            const val = snapS.val(), raw = val.cloudRawData.find(m => (m.STATIONNO || m.StationNo) == id);
-            const total = parseInt(raw["COUNT(*)"] || 0), cyc = (val.extraCycles && val.extraCycles[id]) || 0;
-            const tObj = UNO_STEPS[cyc] || { total: 104000+((cyc-18)*5000), pkg: "Folge" };
-            const rest = tObj.total - total;
-            const newVal = Math.max(0, cyc + v);
-
+            const refCyc = db.ref(`maintenanceStateUnotron/extraCycles/${id}`);
+            const refAssign = db.ref(`dashboardAssignments/U${id}`);
+            const refBackup = db.ref(`maintenanceStateUnotron/lastEinsteller/U${id}`);
+            const snap = await refCyc.once('value');
+            const newVal = Math.max(0, (snap.val() || 0) + v);
             if (v > 0) {
-                const rA = db.ref(`dashboardAssignments/U${id}`), rB = db.ref(`maintenanceStateUnotron/lastEinsteller/U${id}`);
-                const sA = await rA.once('value'); if(sA.val()) await rB.set(sA.val());
-                await rA.set("");
-                await writeLog("Schritt (+)", `U-${id}`, `Zu Schritt ${newVal}`, rest, total, tObj.pkg);
-            } else {
-                const rB = db.ref(`maintenanceStateUnotron/lastEinsteller/U${id}`);
-                const sB = await rB.once('value'); if(sB.val()) await db.ref(`dashboardAssignments/U${id}`).set(sB.val());
-                await writeLog("STORNO (-)", `U-${id}`, `Zurück auf ${newVal}`, rest, total, tObj.pkg);
+                const snapAssign = await refAssign.once('value');
+                if(snapAssign.val()) await refBackup.set(snapAssign.val());
+                await refAssign.set("");
+            } else if (v < 0) {
+                const snapBackup = await refBackup.once('value');
+                if(snapBackup.val()) await refAssign.set(snapBackup.val());
             }
-            await db.ref(`maintenanceStateUnotron/extraCycles/${id}`).set(newVal);
+            await refCyc.set(newVal);
         }
 
         function renderChart(data) {
             const ctx = document.getElementById('mainChart').getContext('2d');
             if(chart) chart.destroy();
-            chart = new Chart(ctx, { type: 'bar', plugins: [ChartDataLabels], data: { labels: data.map(d => "U-" + d.id), datasets: [{ data: data.map(d => d.rest), backgroundColor: data.map(d => d.color) }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'top', rotation: -90, font: { weight: 'bold' } } } } });
+            chart = new Chart(ctx, {
+                type: 'bar', plugins: [ChartDataLabels],
+                data: { labels: data.map(d => "U-" + d.id), datasets: [{ data: data.map(d => d.rest), backgroundColor: data.map(d => d.color) }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'top', rotation: -90, font: { weight: 'bold' } } } }
+            });
         }
     </script>
 </body>
