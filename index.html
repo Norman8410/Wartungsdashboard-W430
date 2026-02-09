@@ -90,9 +90,9 @@
     <div class="modal-box">
         <h2 style="color:var(--bosch-blue); border-bottom: 2px solid var(--bosch-red); padding-bottom: 10px;">System-Anleitung</h2>
         <div style="font-size: 0.9em; line-height: 1.4;">
-            <p><strong>1. Überwachung:</strong> Gelbe/Rote Karten zeigen fällige Wartungen.</p>
+            <p><strong>1. Überwachung:</strong> Gelbe/Rote Karten zeigen fällige Wartungen proportional zum Intervall.</p>
             <p><strong>2. Sicherheit:</strong> Jede Änderung wird im Audit-Log gespeichert.</p>
-            <p><strong>3. Auto-Logout:</strong> Nach 70s Inaktivität (kein Klick/Tastendruck) wird der User ausgeloggt und alle Fenster geschlossen.</p>
+            <p><strong>3. Auto-Logout:</strong> Nach 70s Inaktivität wird der User ausgeloggt.</p>
             <hr>
             <strong>Systemverantwortlicher: Norman Schultheis</strong>
         </div>
@@ -198,13 +198,19 @@
     }
 
     function updateUI() {
-        renderCol('list-agie', 'count-agie', state.agie, 'A', 2000, 500);
-        renderCol('list-uno', 'count-uno', state.uno, 'U', 666, 166);
-        renderCol('list-he', 'count-he', state.he, 'H', 15000, 5000);
+        // Agie: 16k Intervall -> 2000 (12.5%) gelb, 500 (3.1%) rot
+        renderCol('list-agie', 'count-agie', state.agie, 'A', 16000);
+        // Unotron: 2k Intervall -> 250 (12.5%) gelb, 60 (3.1%) rot
+        renderCol('list-uno', 'count-uno', state.uno, 'U', 2000);
+        // HE: 156k Intervall -> 19500 (12.5%) gelb, 4800 (3.1%) rot
+        renderCol('list-he', 'count-he', state.he, 'H', 156000);
     }
 
-    function renderCol(id, cId, raw, pre, warn, crit) {
+    function renderCol(id, cId, raw, pre, interval) {
         if(!raw.cloudRawData) return;
+        const warnLimit = interval * 0.125; // 12.5%
+        const critLimit = interval * 0.03125; // 3.125%
+
         const data = raw.cloudRawData.map(item => {
             const sId = item.StationNo || item.STATIONNO;
             const cIdx = raw.extraCycles?.[sId] || 0;
@@ -219,15 +225,15 @@
                 target = tObj.total; pkg = tObj.pkg;
             } else {
                 ist = (parseInt(item.Parts)||0) - (raw.heOffsets?.[sId]||0);
-                target = 16000 + (cIdx * 16000);
-                pkg = AGIE_PKGS[Math.min(cIdx, AGIE_PKGS.length-1)];
+                target = 156000 + (cIdx * 156000);
+                pkg = "Wartung";
             }
             return { id:pre+sId, rest: target-ist, key:pre+sId, pkg };
-        }).filter(m => m.rest < warn).sort((a,b) => a.rest - b.rest);
+        }).filter(m => m.rest < warnLimit).sort((a,b) => a.rest - b.rest);
 
         document.getElementById(cId).innerText = data.length;
         document.getElementById(id).innerHTML = data.map(m => `
-            <div class="card ${m.rest<=0?'overdue':(m.rest<crit?'critical':'warning')}">
+            <div class="card ${m.rest<=0?'overdue':(m.rest<critLimit?'critical':'warning')}">
                 <div class="card-info">
                     <div><div class="m-id">${m.id}</div><div class="m-paket">${m.pkg}</div></div>
                     <div class="m-rest">${m.rest.toLocaleString()}</div>
