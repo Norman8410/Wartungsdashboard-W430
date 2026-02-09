@@ -32,7 +32,6 @@
         <button class="btn-wp" onclick="window.close()">❌ Schließen</button>
     </div>
     <div class="main-layout"><div class="chart-area"><canvas id="mainChart"></canvas></div><div class="sidebar" id="machineList">Lade Daten...</div></div>
-    
     <script>
         const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung" };
         firebase.initializeApp(firebaseConfig);
@@ -44,24 +43,6 @@
             document.getElementById('auth-status').innerText = user ? `Eingeloggt: ${user.email}` : "⚠️ Nur Lesemodus";
             document.querySelectorAll('.btn-wp, .btn-cycle').forEach(btn => btn.disabled = !user);
         });
-
-        // Zentrales Logging für CSV Export
-        async function writeLog(action, machine, detail, rest, gesamt, paket) {
-            if(!currentUser) return;
-            const now = new Date();
-            await db.ref('auditLog').push({
-                Datum: now.toLocaleDateString('de-DE'),
-                Uhrzeit: now.toLocaleTimeString('de-DE'),
-                Benutzer: currentUser.email,
-                Aktion: action,
-                Maschine: machine,
-                Details: detail,
-                Reststückzahl: rest,
-                Gesamtstückzahl: gesamt,
-                Paket: paket,
-                Status: action.includes("STORNO") ? "Storniert" : (rest <= 0 ? "Erledigt" : "Erledigt vorgezogen")
-            });
-        }
 
         db.ref('maintenanceStateHE').on('value', snap => {
             const val = snap.val() || {}, raw = val.cloudRawData || [], offsets = val.heOffsets || {}, cycles = val.extraCycles || {};
@@ -91,44 +72,24 @@
             const refCyc = db.ref(`maintenanceStateHE/extraCycles/${id}`);
             const refAssign = db.ref(`dashboardAssignments/H${id}`);
             const refBackup = db.ref(`maintenanceStateHE/lastEinsteller/H${id}`);
-            
-            const stateSnap = await db.ref('maintenanceStateHE').once('value');
-            const stateVal = stateSnap.val();
-            const mData = stateVal.cloudRawData.find(m => m.STATIONNO == id);
-            const tot = parseInt(mData.Parts), off = stateVal.heOffsets?.[id] || 0, cyc = stateVal.extraCycles?.[id] || 0;
-            const rest = (156000 + (cyc * 156000)) - (tot - off);
-            
-            const newVal = Math.max(0, cyc + v);
-            
+            const snap = await refCyc.once('value');
+            const newVal = Math.max(0, (snap.val() || 0) + v);
             if (v > 0) {
-                // Bei Erhöhung: Einsteller im Dashboard entfernen, aber Backup speichern
                 const snapAssign = await refAssign.once('value');
                 if(snapAssign.val()) await refBackup.set(snapAssign.val());
                 await refAssign.set("");
-                await writeLog("Paket-Erhöhung (+)", `H-${id}`, `Wechsel zu P${newVal}`, rest, tot, `P${cyc}`);
             } else if (v < 0) {
-                // Bei Storno: Einsteller aus Backup wiederherstellen
                 const snapBackup = await refBackup.once('value');
                 if(snapBackup.val()) await refAssign.set(snapBackup.val());
-                await writeLog("STORNO (-)", `H-${id}`, `Zurück auf P${newVal}`, rest, tot, `P${cyc}`);
             }
             await refCyc.set(newVal);
         }
 
         async function resetWP(id, totalParts) {
-            if(!currentUser || !confirm(`Komplettes WP Reset für H-${id}?`)) return;
-            
-            const stateSnap = await db.ref('maintenanceStateHE').once('value');
-            const stateVal = stateSnap.val();
-            const mData = stateVal.cloudRawData.find(m => m.STATIONNO == id);
-            const tot = parseInt(mData.Parts), off = stateVal.heOffsets?.[id] || 0, cyc = stateVal.extraCycles?.[id] || 0;
-            const rest = (156000 + (cyc * 156000)) - (tot - off);
-
+            if(!currentUser || !confirm(`Reset für H-${id}?`)) return;
             await db.ref(`maintenanceStateHE/heOffsets/${id}`).set(totalParts);
             await db.ref(`maintenanceStateHE/extraCycles/${id}`).set(0);
             await db.ref(`dashboardAssignments/H${id}`).set("");
-            
-            await writeLog("WP-Reset", `H-${id}`, "Grundwartung abgeschlossen", rest, totalParts, "Komplett");
         }
 
         function renderChart(data) {
