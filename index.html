@@ -7,24 +7,23 @@
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        :root { --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-gray: #eff1f2; }
+        :root { --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-gray: #eff1f2; --bosch-green: #008a4f; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
         .card { background: white; padding: 15px; border-radius: 4px; border-top: 5px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .card.urgent { border-top-color: var(--bosch-red); }
-        .card.working { border-top-color: orange; }
-        .btn-export { background: var(--bosch-blue); color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 2px; }
-        .login-area { background: white; padding: 20px; border-radius: 4px; max-width: 300px; margin: 100px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .card.urgent { border-top-color: var(--bosch-red); background: #fff5f5; }
+        .card.working { border-top-color: #ffa500; } /* Orange wenn Einsteller gewählt */
+        .btn-export { background: var(--bosch-blue); color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 2px; font-weight: bold; }
+        .nav-links a { color: var(--bosch-blue); text-decoration: none; margin-right: 15px; font-weight: bold; font-size: 14px; }
+        .login-area { background: white; padding: 20px; border-radius: 4px; max-width: 300px; margin: 100px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center; }
         input, select, button { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
-        .nav-links { margin-top: 10px; font-size: 14px; }
-        .nav-links a { color: var(--bosch-blue); text-decoration: none; margin-right: 15px; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="loginArea" class="login-area">
-        <h2 style="color:var(--bosch-red); margin-top:0;">Login</h2>
+        <h2 style="color:var(--bosch-red);">BOSCH Maintenance</h2>
         <input type="email" id="email" placeholder="E-Mail">
         <input type="password" id="password" placeholder="Passwort">
         <button onclick="login()" style="background:var(--bosch-red); color:white; border:none; cursor:pointer;">Anmelden</button>
@@ -33,14 +32,14 @@
     <div id="mainContent" style="display:none;">
         <div class="header">
             <div>
-                <h1 style="margin:0; font-size:24px;">Wartungs-Dashboard</h1>
+                <h1 style="margin:0; font-size:22px;">Wartungs-Dashboard (Übersicht)</h1>
                 <div class="nav-links">
-                    <a href="agie.html" target="_blank">Agie-Details</a>
-                    <a href="he.html" target="_blank">HE-Details</a>
-                    <a href="unotron.html" target="_blank">Unotron-Details</a>
+                    <a href="agie.html" target="_blank">⚙️ Agie</a>
+                    <a href="he.html" target="_blank">⚙️ HE</a>
+                    <a href="unotron.html" target="_blank">⚙️ Unotron</a>
                 </div>
             </div>
-            <button class="btn-export" onclick="exportCSV()">📊 Audit-Log Export (CSV)</button>
+            <button class="btn-export" onclick="exportCSV()">📊 CSV Export (Audit-Log)</button>
         </div>
         <div class="card-grid" id="dashboardGrid">Lade Maschinen...</div>
     </div>
@@ -54,30 +53,24 @@
 
         function login() {
             auth.signInWithEmailAndPassword(document.getElementById('email').value, document.getElementById('password').value)
-                .catch(err => alert("Login fehlgeschlagen: " + err.message));
+                .catch(err => alert("Login-Fehler: " + err.message));
         }
 
         auth.onAuthStateChanged(user => {
             if(user) {
                 document.getElementById('loginArea').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
-                initDashboard();
+                db.ref().on('value', snap => renderDashboard(snap.val()));
             }
         });
 
-        function initDashboard() {
-            db.ref().on('value', snap => {
-                const data = snap.val();
-                renderAll(data);
-            });
-        }
-
-        function renderAll(data) {
+        function renderDashboard(data) {
             const grid = document.getElementById('dashboardGrid');
             grid.innerHTML = "";
+            if(!data) return;
             const assignments = data.dashboardAssignments || {};
 
-            // Logik für Agie-Karten
+            // 1. AGIE KARTEN
             if(data.maintenanceState && data.maintenanceState.cloudRawData) {
                 data.maintenanceState.cloudRawData.forEach(m => {
                     const id = m.StationNo;
@@ -87,42 +80,59 @@
                     if(rest <= 2000) createCard(grid, `A-${id}`, rest, assignments[`A${id}`], `A${id}`);
                 });
             }
-            // Äquivalente Logik für HE und Unotron hier einfügen...
+
+            // 2. HE KARTEN
+            if(data.maintenanceStateHE && data.maintenanceStateHE.cloudRawData) {
+                data.maintenanceStateHE.cloudRawData.forEach(m => {
+                    const id = m.STATIONNO;
+                    const off = (data.maintenanceStateHE.heOffsets && data.maintenanceStateHE.heOffsets[id]) || 0;
+                    const cyc = (data.maintenanceStateHE.extraCycles && data.maintenanceStateHE.extraCycles[id]) || 0;
+                    const rest = (156000 + (cyc * 156000)) - (parseInt(m.Parts) - off);
+                    if(rest <= 19500) createCard(grid, `H-${id}`, rest, assignments[`H${id}`], `H${id}`);
+                });
+            }
+
+            // 3. UNOTRON KARTEN
+            if(data.maintenanceStateUnotron && data.maintenanceStateUnotron.cloudRawData) {
+                const UNO_STEPS = [2000, 4000, 10000, 14000, 18000, 26000, 28000, 30000, 34000, 42000, 50000, 56000, 58000, 66000, 74000, 82000, 90000, 98000, 104000];
+                data.maintenanceStateUnotron.cloudRawData.forEach(m => {
+                    const id = m.STATIONNO || m.StationNo;
+                    const ist = parseInt(m["COUNT(*)"] || 0);
+                    const cyc = (data.maintenanceStateUnotron.extraCycles && data.maintenanceStateUnotron.extraCycles[id]) || 0;
+                    const target = UNO_STEPS[cyc] || (104000 + ((cyc - 18) * 5000));
+                    const rest = target - ist;
+                    if(rest <= 250) createCard(grid, `U-${id}`, rest, assignments[`U${id}`], `U${id}`);
+                });
+            }
         }
 
         function createCard(container, label, rest, currentAssign, dbKey) {
-            const isUrgent = rest <= 500;
+            const isUrgent = rest <= (label.startsWith('H') ? 4800 : (label.startsWith('U') ? 60 : 500));
             const isWorking = currentAssign && currentAssign !== EINSTELLER[0];
             const div = document.createElement('div');
             div.className = `card ${isUrgent ? 'urgent' : ''} ${isWorking ? 'working' : ''}`;
             div.innerHTML = `
                 <h3 style="margin:0">${label}</h3>
-                <p>Rest: <b>${rest.toLocaleString()}</b></p>
-                <select onchange="assignUser('${dbKey}', this.value)">
+                <p>Reststückzahl: <br><b style="font-size:18px;">${rest.toLocaleString()}</b></p>
+                <select onchange="db.ref('dashboardAssignments/${dbKey}').set(this.value)">
                     ${EINSTELLER.map(e => `<option value="${e}" ${e === currentAssign ? 'selected' : ''}>${e}</option>`).join('')}
                 </select>
             `;
             container.appendChild(div);
         }
 
-        function assignUser(key, val) {
-            db.ref(`dashboardAssignments/${key}`).set(val);
-        }
-
         async function exportCSV() {
             const snap = await db.ref('auditLog').once('value');
             const logs = snap.val();
-            if(!logs) return alert("Keine Audit-Daten vorhanden.");
-
+            if(!logs) return alert("Keine Daten im Log.");
             let csv = "\uFEFFDatum;Uhrzeit;Benutzer;Aktion;Maschine;Details;Reststückzahl;Gesamtstückzahl;Paket;Status\n";
             Object.values(logs).forEach(l => {
-                csv += `${l.Datum || ''};${l.Uhrzeit || ''};${l.Benutzer || ''};${l.Aktion || ''};${l.Maschine || ''};${l.Details || ''};${l.Reststückzahl || ''};${l.Gesamtstückzahl || ''};${l.Paket || ''};${l.Status || ''}\n`;
+                csv += `${l.Datum};${l.Uhrzeit};${l.Benutzer};${l.Aktion};${l.Maschine};${l.Details};${l.Reststückzahl};${l.Gesamtstückzahl};${l.Paket};${l.Status}\n`;
             });
-
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = `AuditLog_Wartung.csv`;
+            link.download = "AuditLog_Wartung.csv";
             link.click();
         }
     </script>
