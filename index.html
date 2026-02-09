@@ -9,24 +9,40 @@
     <style>
         :root { --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-gray: #eff1f2; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 20px; }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
-        .card { background: white; padding: 15px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-top: 4px solid #ccc; position: relative; }
-        .card.urgent { border-top-color: var(--bosch-red); background: #fff5f5; }
-        .btn-export { background: var(--bosch-blue); color: white; padding: 10px 20px; border: none; cursor: pointer; margin-bottom: 20px; }
-        .login-area { margin-bottom: 20px; padding: 15px; background: white; border-radius: 4px; }
-        select { width: 100%; padding: 5px; margin-top: 10px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
+        .card { background: white; padding: 15px; border-radius: 4px; border-top: 5px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .card.urgent { border-top-color: var(--bosch-red); }
+        .card.working { border-top-color: orange; }
+        .btn-export { background: var(--bosch-blue); color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 2px; }
+        .login-area { background: white; padding: 20px; border-radius: 4px; max-width: 300px; margin: 100px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        input, select, button { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
+        .nav-links { margin-top: 10px; font-size: 14px; }
+        .nav-links a { color: var(--bosch-blue); text-decoration: none; margin-right: 15px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="login-area" id="loginArea">
+
+    <div id="loginArea" class="login-area">
+        <h2 style="color:var(--bosch-red); margin-top:0;">Login</h2>
         <input type="email" id="email" placeholder="E-Mail">
         <input type="password" id="password" placeholder="Passwort">
-        <button onclick="login()">Login</button>
+        <button onclick="login()" style="background:var(--bosch-red); color:white; border:none; cursor:pointer;">Anmelden</button>
     </div>
-    
+
     <div id="mainContent" style="display:none;">
-        <button class="btn-export" onclick="exportCSV()">📊 Audit-Log als CSV exportieren</button>
-        <div class="card-grid" id="dashboardGrid">Lade Daten...</div>
+        <div class="header">
+            <div>
+                <h1 style="margin:0; font-size:24px;">Wartungs-Dashboard</h1>
+                <div class="nav-links">
+                    <a href="agie.html" target="_blank">Agie-Details</a>
+                    <a href="he.html" target="_blank">HE-Details</a>
+                    <a href="unotron.html" target="_blank">Unotron-Details</a>
+                </div>
+            </div>
+            <button class="btn-export" onclick="exportCSV()">📊 Audit-Log Export (CSV)</button>
+        </div>
+        <div class="card-grid" id="dashboardGrid">Lade Maschinen...</div>
     </div>
 
     <script>
@@ -34,47 +50,79 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         const auth = firebase.auth();
+        const EINSTELLER = ["-- Einsteller wählen --", "Müller", "Schmidt", "Fischer", "Weber", "Meyer"];
 
         function login() {
             auth.signInWithEmailAndPassword(document.getElementById('email').value, document.getElementById('password').value)
-                .catch(err => alert("Fehler: " + err.message));
+                .catch(err => alert("Login fehlgeschlagen: " + err.message));
         }
 
         auth.onAuthStateChanged(user => {
             if(user) {
                 document.getElementById('loginArea').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
-                loadDashboard();
+                initDashboard();
             }
         });
 
-        function loadDashboard() {
-            // Hier würde die Logik stehen, die Karten für Agie, HE und Unotron anzeigt
-            // Vereinfacht für dieses Beispiel:
+        function initDashboard() {
             db.ref().on('value', snap => {
                 const data = snap.val();
-                renderCards(data);
+                renderAll(data);
             });
         }
 
-        function renderCards(data) {
-            // Karten-Rendering Logik...
+        function renderAll(data) {
+            const grid = document.getElementById('dashboardGrid');
+            grid.innerHTML = "";
+            const assignments = data.dashboardAssignments || {};
+
+            // Logik für Agie-Karten
+            if(data.maintenanceState && data.maintenanceState.cloudRawData) {
+                data.maintenanceState.cloudRawData.forEach(m => {
+                    const id = m.StationNo;
+                    const off = (data.maintenanceState.agieOffsets && data.maintenanceState.agieOffsets[id]) || 0;
+                    const cyc = (data.maintenanceState.extraCycles && data.maintenanceState.extraCycles[id]) || 0;
+                    const rest = (16000 + (cyc * 16000)) - (parseInt(m.Parts) - off);
+                    if(rest <= 2000) createCard(grid, `A-${id}`, rest, assignments[`A${id}`], `A${id}`);
+                });
+            }
+            // Äquivalente Logik für HE und Unotron hier einfügen...
+        }
+
+        function createCard(container, label, rest, currentAssign, dbKey) {
+            const isUrgent = rest <= 500;
+            const isWorking = currentAssign && currentAssign !== EINSTELLER[0];
+            const div = document.createElement('div');
+            div.className = `card ${isUrgent ? 'urgent' : ''} ${isWorking ? 'working' : ''}`;
+            div.innerHTML = `
+                <h3 style="margin:0">${label}</h3>
+                <p>Rest: <b>${rest.toLocaleString()}</b></p>
+                <select onchange="assignUser('${dbKey}', this.value)">
+                    ${EINSTELLER.map(e => `<option value="${e}" ${e === currentAssign ? 'selected' : ''}>${e}</option>`).join('')}
+                </select>
+            `;
+            container.appendChild(div);
+        }
+
+        function assignUser(key, val) {
+            db.ref(`dashboardAssignments/${key}`).set(val);
         }
 
         async function exportCSV() {
             const snap = await db.ref('auditLog').once('value');
             const logs = snap.val();
-            if(!logs) return alert("Keine Daten vorhanden");
+            if(!logs) return alert("Keine Audit-Daten vorhanden.");
 
             let csv = "\uFEFFDatum;Uhrzeit;Benutzer;Aktion;Maschine;Details;Reststückzahl;Gesamtstückzahl;Paket;Status\n";
             Object.values(logs).forEach(l => {
-                csv += `${l.Datum};${l.Uhrzeit};${l.Benutzer};${l.Aktion};${l.Maschine};${l.Details};${l.Reststückzahl};${l.Gesamtstückzahl};${l.Paket};${l.Status}\n`;
+                csv += `${l.Datum || ''};${l.Uhrzeit || ''};${l.Benutzer || ''};${l.Aktion || ''};${l.Maschine || ''};${l.Details || ''};${l.Reststückzahl || ''};${l.Gesamtstückzahl || ''};${l.Paket || ''};${l.Status || ''}\n`;
             });
 
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = `WartungsLog_${new Date().toLocaleDateString()}.csv`;
+            link.download = `AuditLog_Wartung.csv`;
             link.click();
         }
     </script>
