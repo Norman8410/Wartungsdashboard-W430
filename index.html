@@ -7,13 +7,13 @@
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        :root { --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-gray: #eff1f2; --bosch-green: #008a4f; }
+        :root { --bosch-red: #d50000; --bosch-blue: #003a6c; --bosch-gray: #eff1f2; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bosch-gray); margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
         .card { background: white; padding: 15px; border-radius: 4px; border-top: 5px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .card.urgent { border-top-color: var(--bosch-red); background: #fff5f5; }
-        .card.working { border-top-color: #ffa500; } /* Orange wenn Einsteller gewählt */
+        .card.working { border-top-color: #ffa500; }
         .btn-export { background: var(--bosch-blue); color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 2px; font-weight: bold; }
         .nav-links a { color: var(--bosch-blue); text-decoration: none; margin-right: 15px; font-weight: bold; font-size: 14px; }
         .login-area { background: white; padding: 20px; border-radius: 4px; max-width: 300px; margin: 100px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center; }
@@ -32,7 +32,7 @@
     <div id="mainContent" style="display:none;">
         <div class="header">
             <div>
-                <h1 style="margin:0; font-size:22px;">Wartungs-Dashboard (Übersicht)</h1>
+                <h1 style="margin:0; font-size:22px;">Wartungs-Dashboard</h1>
                 <div class="nav-links">
                     <a href="agie.html" target="_blank">⚙️ Agie</a>
                     <a href="he.html" target="_blank">⚙️ HE</a>
@@ -41,7 +41,7 @@
             </div>
             <button class="btn-export" onclick="exportCSV()">📊 CSV Export (Audit-Log)</button>
         </div>
-        <div class="card-grid" id="dashboardGrid">Lade Maschinen...</div>
+        <div class="card-grid" id="dashboardGrid">Suche fällige Wartungen...</div>
     </div>
 
     <script>
@@ -60,50 +60,51 @@
             if(user) {
                 document.getElementById('loginArea').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
-                db.ref().on('value', snap => renderDashboard(snap.val()));
+                db.ref().on('value', snap => {
+                    const data = snap.val();
+                    if (data) renderDashboard(data);
+                });
             }
         });
 
         function renderDashboard(data) {
             const grid = document.getElementById('dashboardGrid');
             grid.innerHTML = "";
-            if(!data) return;
             const assignments = data.dashboardAssignments || {};
 
-            // 1. AGIE KARTEN
-            if(data.maintenanceState && data.maintenanceState.cloudRawData) {
-                data.maintenanceState.cloudRawData.forEach(m => {
-                    const id = m.StationNo;
-                    const off = (data.maintenanceState.agieOffsets && data.maintenanceState.agieOffsets[id]) || 0;
-                    const cyc = (data.maintenanceState.extraCycles && data.maintenanceState.extraCycles[id]) || 0;
-                    const rest = (16000 + (cyc * 16000)) - (parseInt(m.Parts) - off);
-                    if(rest <= 2000) createCard(grid, `A-${id}`, rest, assignments[`A${id}`], `A${id}`);
-                });
-            }
+            // AGIE
+            const agieData = data.maintenanceState?.cloudRawData || [];
+            agieData.forEach(m => {
+                const id = m.StationNo;
+                const off = data.maintenanceState.agieOffsets?.[id] || 0;
+                const cyc = data.maintenanceState.extraCycles?.[id] || 0;
+                const rest = (16000 + (cyc * 16000)) - (parseInt(m.Parts) - off);
+                if(rest <= 2000) createCard(grid, `A-${id}`, rest, assignments[`A${id}`], `A${id}`);
+            });
 
-            // 2. HE KARTEN
-            if(data.maintenanceStateHE && data.maintenanceStateHE.cloudRawData) {
-                data.maintenanceStateHE.cloudRawData.forEach(m => {
-                    const id = m.STATIONNO;
-                    const off = (data.maintenanceStateHE.heOffsets && data.maintenanceStateHE.heOffsets[id]) || 0;
-                    const cyc = (data.maintenanceStateHE.extraCycles && data.maintenanceStateHE.extraCycles[id]) || 0;
-                    const rest = (156000 + (cyc * 156000)) - (parseInt(m.Parts) - off);
-                    if(rest <= 19500) createCard(grid, `H-${id}`, rest, assignments[`H${id}`], `H${id}`);
-                });
-            }
+            // HE
+            const heData = data.maintenanceStateHE?.cloudRawData || [];
+            heData.forEach(m => {
+                const id = m.STATIONNO;
+                const off = data.maintenanceStateHE.heOffsets?.[id] || 0;
+                const cyc = data.maintenanceStateHE.extraCycles?.[id] || 0;
+                const rest = (156000 + (cyc * 156000)) - (parseInt(m.Parts) - off);
+                if(rest <= 19500) createCard(grid, `H-${id}`, rest, assignments[`H${id}`], `H${id}`);
+            });
 
-            // 3. UNOTRON KARTEN
-            if(data.maintenanceStateUnotron && data.maintenanceStateUnotron.cloudRawData) {
-                const UNO_STEPS = [2000, 4000, 10000, 14000, 18000, 26000, 28000, 30000, 34000, 42000, 50000, 56000, 58000, 66000, 74000, 82000, 90000, 98000, 104000];
-                data.maintenanceStateUnotron.cloudRawData.forEach(m => {
-                    const id = m.STATIONNO || m.StationNo;
-                    const ist = parseInt(m["COUNT(*)"] || 0);
-                    const cyc = (data.maintenanceStateUnotron.extraCycles && data.maintenanceStateUnotron.extraCycles[id]) || 0;
-                    const target = UNO_STEPS[cyc] || (104000 + ((cyc - 18) * 5000));
-                    const rest = target - ist;
-                    if(rest <= 250) createCard(grid, `U-${id}`, rest, assignments[`U${id}`], `U${id}`);
-                });
-            }
+            // UNOTRON
+            const unoData = data.maintenanceStateUnotron?.cloudRawData || [];
+            const UNO_STEPS = [2000, 4000, 10000, 14000, 18000, 26000, 28000, 30000, 34000, 42000, 50000, 56000, 58000, 66000, 74000, 82000, 90000, 98000, 104000];
+            unoData.forEach(m => {
+                const id = m.STATIONNO || m.StationNo;
+                const ist = parseInt(m["COUNT(*)"] || 0);
+                const cyc = data.maintenanceStateUnotron.extraCycles?.[id] || 0;
+                const target = UNO_STEPS[cyc] || (104000 + ((cyc - 18) * 5000));
+                const rest = target - ist;
+                if(rest <= 250) createCard(grid, `U-${id}`, rest, assignments[`U${id}`], `U${id}`);
+            });
+
+            if(grid.innerHTML === "") grid.innerHTML = "<p>Aktuell keine Wartungen fällig.</p>";
         }
 
         function createCard(container, label, rest, currentAssign, dbKey) {
@@ -113,7 +114,7 @@
             div.className = `card ${isUrgent ? 'urgent' : ''} ${isWorking ? 'working' : ''}`;
             div.innerHTML = `
                 <h3 style="margin:0">${label}</h3>
-                <p>Reststückzahl: <br><b style="font-size:18px;">${rest.toLocaleString()}</b></p>
+                <p>Rest: <b>${rest.toLocaleString()}</b></p>
                 <select onchange="db.ref('dashboardAssignments/${dbKey}').set(this.value)">
                     ${EINSTELLER.map(e => `<option value="${e}" ${e === currentAssign ? 'selected' : ''}>${e}</option>`).join('')}
                 </select>
@@ -124,15 +125,15 @@
         async function exportCSV() {
             const snap = await db.ref('auditLog').once('value');
             const logs = snap.val();
-            if(!logs) return alert("Keine Daten im Log.");
+            if(!logs) return alert("Keine Daten.");
             let csv = "\uFEFFDatum;Uhrzeit;Benutzer;Aktion;Maschine;Details;Reststückzahl;Gesamtstückzahl;Paket;Status\n";
             Object.values(logs).forEach(l => {
-                csv += `${l.Datum};${l.Uhrzeit};${l.Benutzer};${l.Aktion};${l.Maschine};${l.Details};${l.Reststückzahl};${l.Gesamtstückzahl};${l.Paket};${l.Status}\n`;
+                csv += `${l.Datum||''};${l.Uhrzeit||''};${l.Benutzer||''};${l.Aktion||''};${l.Maschine||''};${l.Details||''};${l.Reststückzahl||''};${l.Gesamtstückzahl||''};${l.Paket||''};${l.Status||''}\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = "AuditLog_Wartung.csv";
+            link.download = "AuditLog.csv";
             link.click();
         }
     </script>
