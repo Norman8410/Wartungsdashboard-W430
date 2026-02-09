@@ -37,6 +37,7 @@
         const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        const AGIE_PKGS = ["P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/5", "P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/6/7", "P1/2"];
         let chart = null;
 
         db.ref('maintenanceState').on('value', snap => {
@@ -50,11 +51,12 @@
                 const ist = (parseInt(item.Parts) || 0) - (offsets[id] || 0);
                 const cyc = cycles[id] || 0;
                 const rest = (16000 + cyc * 16000) - ist;
+                const pkg = AGIE_PKGS[Math.min(cyc, AGIE_PKGS.length-1)];
                 let color = "#008a4f";
                 if(rest <= 0) color = "#8b0000";
                 else if(rest <= 500) color = "#d50000";
                 else if(rest <= 2000) color = "#ffa500";
-                return { id, rest, color, cyc };
+                return { id, rest, ist, color, cyc, pkg };
             }).sort((a,b) => a.rest - b.rest);
 
             renderList(data);
@@ -91,8 +93,26 @@
             if(chart) chart.destroy();
             chart = new Chart(ctx, {
                 type: 'bar', plugins: [ChartDataLabels],
-                data: { labels: data.map(d=>"A-"+d.id), datasets: [{ data: data.map(d=>d.rest), backgroundColor: data.map(d=>d.color) }] },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'top', rotation: -90, font: { weight: 'bold' } } } }
+                data: { labels: data.map(d=>"A-"+d.id), datasets: [{ data: data.map(d=>d.rest), backgroundColor: data.map(d=>d.color), ist: data.map(d=>d.ist), pkg: data.map(d=>d.pkg) }] },
+                options: { 
+                    responsive: true, maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { display: false }, 
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const d = data[context.dataIndex];
+                                    return [
+                                        `Offene Wartung: ${d.pkg}`,
+                                        `Gesamt Stückzahl seit WP-Reset: ${d.ist.toLocaleString()}`,
+                                        `Rest Stückzahl bis Wartung: ${d.rest.toLocaleString()}`
+                                    ];
+                                }
+                            }
+                        },
+                        datalabels: { anchor: 'end', align: 'top', rotation: -90, font: { weight: 'bold' } } 
+                    } 
+                }
             });
         }
     </script>
