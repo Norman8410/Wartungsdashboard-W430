@@ -16,8 +16,9 @@
         .chart-area { flex: 3; background: white; padding: 20px; border-top: 4px solid var(--bosch-red); border-radius: 4px; }
         .sidebar { flex: 1.5; background: white; border-top: 4px solid var(--bosch-blue); overflow-y: auto; padding: 10px; border-radius: 4px; }
         .row { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; gap: 10px; border-left: 8px solid #ccc; margin-bottom: 5px; }
-        .btn-wp { background: var(--bosch-red); color: white; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; }
-        .btn-cycle { padding: 5px 10px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; }
+        .btn-wp { background: var(--bosch-red); color: white; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; border-radius: 2px; }
+        .btn-cycle { padding: 5px 10px; cursor: pointer; border: 1px solid #ccc; background: white; font-weight: bold; border-radius: 2px; }
+        .btn-cycle:active, .btn-wp:active { transform: translateY(1px); filter: brightness(0.9); }
         @keyframes blink-red { 0% { background: #fff; } 50% { background: #ffcccc; } 100% { background: #fff; } }
         .blink { animation: blink-red 1s infinite; }
     </style>
@@ -30,18 +31,21 @@
     </div>
     <div class="main-layout">
         <div class="chart-area"><canvas id="mainChart"></canvas></div>
-        <div class="sidebar" id="machineList">Lade Daten...</div>
+        <div class="sidebar" id="machineList">Verbindung wird hergestellt...</div>
     </div>
 
     <script>
-        const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app" };
+        const firebaseConfig = { 
+            apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", 
+            databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app" 
+        };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         
         const AGIE_PKGS = ["P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/5", "P1/2", "P1/3", "P1/2", "P1/4", "P1/2/3", "P1/6/7", "P1/2"];
         let chart = null;
 
-        // Echtzeit-Überwachung der Datenbank
+        // Daten einmalig und dann bei Änderungen laden
         db.ref('maintenanceState').on('value', snap => {
             const val = snap.val() || {};
             const raw = val.cloudRawData || [];
@@ -58,10 +62,10 @@
                 const rest = target - ist;
                 const pkg = AGIE_PKGS[Math.min(cyc, AGIE_PKGS.length - 1)];
                 
-                let color = "#008a4f"; // Grün
-                if(rest <= 0) color = "#8b0000"; // Dunkelrot
-                else if(rest <= 500) color = "#d50000"; // Bosch Rot
-                else if(rest <= 2000) color = "#ffa500"; // Orange
+                let color = "#008a4f"; 
+                if(rest <= 0) color = "#8b0000"; 
+                else if(rest <= 500) color = "#d50000"; 
+                else if(rest <= 2000) color = "#ffa500"; 
                 
                 return { id, rest, ist, color, cyc, pkg, totalParts };
             }).sort((a,b) => a.rest - b.rest);
@@ -77,28 +81,40 @@
                     <div style="flex:1; text-align:right;"><b>${d.rest.toLocaleString()}</b></div>
                     <button class="btn-wp" onclick="resetWP('${d.id}', ${d.totalParts})">WP</button>
                     <button class="btn-cycle" onclick="changeC('${d.id}', -1)">-</button>
-                    <span style="min-width: 20px; text-align: center;">${d.cyc}</span>
+                    <span style="min-width: 25px; text-align: center; font-weight: bold;">${d.cyc}</span>
                     <button class="btn-cycle" onclick="changeC('${d.id}', 1)">+</button>
                 </div>`).join('');
         }
 
-        // Funktion zum Ändern des Wartungs-Zyklus (P1, P2...)
+        // ABSOLUTE SPEICHERUNG: Nutzt .update() statt .set() für bessere Stabilität
         async function changeC(id, v) {
-            const ref = db.ref(`maintenanceState/extraCycles/${id}`);
-            const snap = await ref.once('value');
+            const ref = db.ref(`maintenanceState/extraCycles`);
+            const snap = await ref.child(id).once('value');
             const current = snap.val() || 0;
             const newVal = Math.max(0, current + v);
-            await ref.set(newVal);
+            
+            // Wir schreiben gezielt nur dieses eine Feld neu
+            try {
+                await ref.update({ [id]: newVal });
+                console.log(`Zyklus für A-${id} auf ${newVal} gesetzt.`);
+            } catch (e) {
+                alert("Fehler beim Speichern: " + e.message);
+            }
         }
 
-        // Funktion für den Wartungsplan-Reset (WP Knopf)
         async function resetWP(id, totalParts) {
-            if(confirm(`Wartungsplan für A-${id} wirklich zurücksetzen? (Zähler wird auf 0 gesetzt)`)) {
-                // Der neue Offset ist der aktuelle Gesamtstand der Maschine
-                await db.ref(`maintenanceState/agieOffsets/${id}`).set(totalParts);
-                // Die Extra-Zyklen (Pakete) werden wieder auf 0 gesetzt
-                await db.ref(`maintenanceState/extraCycles/${id}`).set(0);
-                alert(`Reset für A-${id} erfolgreich durchgeführt.`);
+            if(confirm(`Wartungsplan für A-${id} wirklich zurücksetzen?\nMaschinenstand: ${totalParts}`)) {
+                try {
+                    // Update beider Werte gleichzeitig (Atomarer Schreibvorgang)
+                    const updates = {};
+                    updates[`maintenanceState/agieOffsets/${id}`] = totalParts;
+                    updates[`maintenanceState/extraCycles/${id}`] = 0;
+                    
+                    await db.ref().update(updates);
+                    console.log(`Reset für A-${id} erfolgreich.`);
+                } catch (e) {
+                    alert("Fehler beim Reset: " + e.message);
+                }
             }
         }
 
