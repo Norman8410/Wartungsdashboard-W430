@@ -31,6 +31,7 @@
         <button class="btn-cycle" onclick="window.close()">❌ Schließen</button>
     </div>
     <div class="main-layout"><div class="chart-area"><canvas id="mainChart"></canvas></div><div class="sidebar" id="machineList">Lade Daten...</div></div>
+
     <script>
         const firebaseConfig = { apiKey: "AIzaSyD6xGCtU-felOyO_BRsFnVlB4yhC46FgYg", authDomain: "bosch-agie-wartung.firebaseapp.com", databaseURL: "https://bosch-agie-wartung-default-rtdb.europe-west1.firebasedatabase.app", projectId: "bosch-agie-wartung" };
         firebase.initializeApp(firebaseConfig);
@@ -44,12 +45,31 @@
             document.querySelectorAll('.btn-cycle').forEach(btn => btn.disabled = !user);
         });
 
+        // Zentrales Logging für CSV Export
+        async function writeLog(action, machine, detail, rest, gesamt, paket) {
+            if(!currentUser) return;
+            const now = new Date();
+            await db.ref('auditLog').push({
+                Datum: now.toLocaleDateString('de-DE'),
+                Uhrzeit: now.toLocaleTimeString('de-DE'),
+                Benutzer: currentUser.email,
+                Aktion: action,
+                Maschine: machine,
+                Details: detail,
+                Reststückzahl: rest,
+                Gesamtstückzahl: gesamt,
+                Paket: paket,
+                Status: action.includes("STORNO") ? "Storniert" : (rest <= 0 ? "Erledigt" : "Erledigt vorgezogen")
+            });
+        }
+
         db.ref('maintenanceStateUnotron').on('value', snap => {
             const val = snap.val() || {}, raw = val.cloudRawData || [], cycles = val.extraCycles || {};
             const data = raw.map(item => {
                 const id = item.STATIONNO || item["StationNo"], ist = parseInt(item["COUNT(*)"] || 0), cyc = cycles[id] || 0;
                 const tObj = UNO_STEPS[cyc] || { total: 104000+((cyc-18)*5000), pkg: "Folge" };
-                return { id, rest: tObj.total - ist, ist, color: getC(tObj.total - ist), cyc, pkg: tObj.pkg };
+                const rest = tObj.total - ist;
+                return { id, rest, ist, color: getC(rest), cyc, pkg: tObj.pkg };
             }).sort((a,b) => a.rest - b.rest);
             renderList(data); renderChart(data);
         });
@@ -72,15 +92,26 @@
             const refCyc = db.ref(`maintenanceStateUnotron/extraCycles/${id}`);
             const refAssign = db.ref(`dashboardAssignments/U${id}`);
             const refBackup = db.ref(`maintenanceStateUnotron/lastEinsteller/U${id}`);
-            const snap = await refCyc.once('value');
-            const newVal = Math.max(0, (snap.val() || 0) + v);
+            
+            const stateSnap = await db.ref('maintenanceStateUnotron').once('value');
+            const stateVal = stateSnap.val();
+            const mData = stateVal.cloudRawData.find(m => (m.STATIONNO || m.StationNo) == id);
+            const ist = parseInt(mData["COUNT(*)"] || 0), cyc = stateVal.extraCycles?.[id] || 0;
+            const tObj = UNO_STEPS[cyc] || { total: 104000, pkg: "Unbekannt" };
+            const rest = tObj.total - ist;
+            
+            const newVal = Math.max(0, cyc + v);
+            const newTObj = UNO_STEPS[newVal] || { pkg: "Folge" };
+
             if (v > 0) {
                 const snapAssign = await refAssign.once('value');
                 if(snapAssign.val()) await refBackup.set(snapAssign.val());
                 await refAssign.set("");
+                await writeLog("Paket-Erhöhung (+)", `U-${id}`, `Wechsel zu ${newTObj.pkg}`, rest, ist, tObj.pkg);
             } else if (v < 0) {
                 const snapBackup = await refBackup.once('value');
                 if(snapBackup.val()) await refAssign.set(snapBackup.val());
+                await writeLog("STORNO (-)", `U-${id}`, `Zurück auf ${newTObj.pkg}`, rest, ist, tObj.pkg);
             }
             await refCyc.set(newVal);
         }
